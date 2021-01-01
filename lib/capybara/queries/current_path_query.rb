@@ -25,8 +25,23 @@ module Capybara
 
         res = if @expected_path.is_a? Regexp
           @actual_path.to_s.match?(@expected_path)
-        else
-          ::Addressable::URI.parse(@expected_path) == ::Addressable::URI.parse(@actual_path)
+              else
+                expected = ::Addressable::URI.parse(@expected_path)
+                actual = ::Addressable::URI.parse(@actual_path)
+
+                expected_hash = {
+                    :scheme => expected.scheme, :user => expected.user, :password => expected.password,
+                    :host => expected.host, :port => expected.port, :path => expected.path,
+                    :query => expected.query_values, :fragment => expected.fragment
+                }
+
+                actual_hash ={
+                    :scheme => actual.scheme, :user => actual.user, :password => actual.password,
+                    :host => actual.host, :port => actual.port, :path => actual.path,
+                    :query => actual.query_values, :fragment => actual.fragment
+                }
+
+                expected_hash == actual_hash
         end
 
         res && matches_filter_block?(uri)
