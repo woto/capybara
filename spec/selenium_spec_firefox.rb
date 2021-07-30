@@ -14,28 +14,30 @@ browser_options.profile = Selenium::WebDriver::Firefox::Profile.new.tap do |prof
   profile['browser.download.dir'] = Capybara.save_path
   profile['browser.download.folderList'] = 2
   profile['browser.helperApps.neverAsk.saveToDisk'] = 'text/csv'
+  profile['browser.startup.homepage'] = 'about:blank' # workaround bug in Selenium 4 alpha4-7
 end
 
 Capybara.register_driver :selenium_firefox do |app|
   # ::Selenium::WebDriver.logger.level = "debug"
-  Capybara::Selenium::Driver.new(
-    app,
-    browser: :firefox,
-    options: browser_options,
-    timeout: 31
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
+  driver_options = { browser: :firefox, timeout: 31 }.tap do |opts|
+    opts[options_key] = browser_options
     # Get a trace level log from geckodriver
     # :driver_opts => { args: ['-vv'] }
-  )
+  end
+
+  Capybara::Selenium::Driver.new(app, **driver_options)
 end
 
 Capybara.register_driver :selenium_firefox_not_clear_storage do |app|
-  Capybara::Selenium::Driver.new(
-    app,
-    browser: :firefox,
-    clear_local_storage: false,
-    clear_session_storage: false,
-    options: browser_options
-  )
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
+  driver_options = { browser: :firefox, clear_local_storage: false, clear_session_storage: false }.tap do |opts|
+    opts[options_key] = browser_options
+  end
+
+  Capybara::Selenium::Driver.new(app, **driver_options)
 end
 
 module TestSessions

@@ -170,7 +170,7 @@ New line after and before textarea tag
     <label for="gender_male">Male</label>
     <input type="radio" name="form[gender]" value="female" id="gender_female" checked="checked"/>
     <label for="gender_female">Female</label>
-    <input type="radio" name="form[gender]" value="both" id="gender_both"/>
+    <input type="radio" name="form[gender]" value="both" id="gender_both" readonly="readonly"/>
     <label for="gender_both">Both</label>
   </p>
 
@@ -223,6 +223,8 @@ New line after and before textarea tag
     </label>
     <input type="checkbox" value="maserati" name="form[cars][]" id="form_cars_maserati" disabled="disabled"/>
     <label for="form_cars_maserati">Maserati</label>
+    <input type="checkbox" value="lotus" name="form[cars][]" id="form_cars_lotus" style="display: none"/>
+    <label for="form_cars_lotus"><a href="#" onclick="return false;">Link here</a>Lotus</label>
   </p>
 
   <p>
@@ -449,7 +451,7 @@ New line after and before textarea tag
 
   <p>
     <input type="button" aria-label="Aria button" name="form[fresh]" id="fresh_btn" value="i am fresh"/>
-    <input type="submit" name="form[awesome]" id="awe123" title="What an Awesome Button" value="awesome"/>
+    <input type="submit" name="form[awesome]" id="awe123" data-test-id="test_id_button" title="What an Awesome Button" value="awesome"/>
     <input type="submit" name="form[crappy]" id="crap321" value="crappy"/>
     <input type="image" name="form[okay]" id="okay556" title="Okay 556 Image" value="okay" alt="oh hai thar"/>
     <button type="submit" id="click_me_123" title="Click Title button" value="click_me">Click me!</button>
@@ -461,6 +463,10 @@ New line after and before textarea tag
     <label>
       button within label element
       <button></button>
+    </label>
+    <label>
+      role=button within label element
+      <span role="button">with other text</span>
     </label>
     <input type="button" disabled="disabled" value="Disabled button"/>
     <span role="button">ARIA button</span>

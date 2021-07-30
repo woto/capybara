@@ -21,8 +21,8 @@ def ensure_selenium_running!
   rescue StandardError
     if timer.expired?
       raise 'Selenium is not running. ' \
-          "You can run a selenium server easily with: \n" \
-          '  $ docker-compose up -d selenium_chrome'
+            "You can run a selenium server easily with: \n" \
+            '  $ docker-compose up -d selenium_chrome'
     else
       puts 'Waiting for Selenium docker instance...'
       sleep 1
@@ -62,8 +62,6 @@ Capybara::SpecHelper.run_specs TestSessions::Chrome, CHROME_REMOTE_DRIVER.to_s, 
        'Capybara::Session selenium_chrome_remote #attach_file with multipart form should fire change once for each set of files uploaded',
        'Capybara::Session selenium_chrome_remote #attach_file with multipart form should fire change once when uploading multiple files from empty'
     pending "Selenium with Remote Chrome doesn't support multiple file upload" unless selenium_gte?(3.14)
-  when /node #right_click delay should delay the mouse up/
-    skip "Legacy selenium doesn't support separate right button down/up" if ENV['W3C'] == 'false'
   end
 end
 
@@ -78,10 +76,7 @@ RSpec.describe 'Capybara::Session with remote Chrome' do
   end
 
   describe 'log access' do
-    before { skip 'Only makes sense in W3C mode' if ENV['W3C'] == 'false' }
-
     it 'does not error when getting log types' do
-      skip if Gem::Version.new(session.driver.browser.capabilities['chrome']['chromedriverVersion'].split[0]) < Gem::Version.new('75.0.3770.90')
       expect do
         session.driver.browser.manage.logs.available_types
       end.not_to raise_error
@@ -92,5 +87,9 @@ RSpec.describe 'Capybara::Session with remote Chrome' do
         session.driver.browser.manage.logs.get(:browser)
       end.not_to raise_error
     end
+  end
+
+  def chromedriver_version
+    Gem::Version.new(session.driver.browser.capabilities['chrome']['chromedriverVersion'].split[0])
   end
 end

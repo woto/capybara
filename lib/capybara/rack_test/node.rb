@@ -108,6 +108,13 @@ class Capybara::RackTest::Node < Capybara::Driver::Node
     end
   end
 
+  def readonly?
+    # readonly attribute not valid on these input types
+    return false if input_field? && %w[hidden range color checkbox radio file submit image reset button].include?(type)
+
+    super
+  end
+
   def path
     native.path
   end
@@ -139,10 +146,6 @@ class Capybara::RackTest::Node < Capybara::Driver::Node
     end
   end
 
-  def ==(other)
-    native == other.native
-  end
-
 protected
 
   # @api private
@@ -159,7 +162,7 @@ protected
       end.join || ''
       text = "\n#{text}\n" if BLOCK_ELEMENTS.include?(tag_name)
       text
-    else
+    else # rubocop:disable Lint/DuplicateBranch
       ''
     end
   end

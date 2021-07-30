@@ -1,3 +1,67 @@
+# Version 3.36.0
+Release date: unreleased
+
+### Changed
+
+* Ruby 2.6.0+ is now required
+
+### Added
+
+* `allow_label_click` accepts click options to be used when clicking an associated label
+
+### Fixed
+
+* Sibling and ancestor queries now work with Simple::Node - Issue #2452
+* rack_test correctly ignores readonly attribute on specific input element types
+* `Node#all_text` always returns a string - Issue #2477
+* `have_any_of_selectors` negated match - Issue #2473
+* `Document#scroll_to` fixed for standards behavior - pass quirks: true if you need the older behavior [Eric Anderson]
+
+
+### Removed
+
+* References to non-w3c mode in drivers/tests. Non-w3c mode is obsolete and no one should be using it anymore. Capybara hasn't been testing/supporting it in a while
+
+# Version 3.35.3
+Release date: 2021-01-29
+
+### Fixed
+
+* Just a release to have the correct dates in the History.md in released gem
+
+# Version 3.35.2
+Release date: 2021-01-29
+
+### Fixed
+
+* Selenium deprecation suppressor with Selenium 3.x
+
+# Version 3.35.1
+Release date: 2021-01-26
+
+### Fixed
+
+* Default chrome driver registrations use chrome - Issue #2442 [Yuriy Alekseyev]
+* 'Capybara.test_id' usage with the :button selector - Issue #2443
+
+# Version 3.35.0
+Release date: 2021-01-25
+
+### Added
+
+* Support Regexp matching for individual class names in :class filter passed an Array
+* Animation disabler now supports JQuery animation disabling when JQuery loaded from body [Chien-Wei Huang]
+
+### Fixed
+
+* :button selector type use with `enable_aria_role` [Sean Doyle]
+* <label> elements don't associate with aria-role buttons
+* Ignore Selenium::WebDriver::Error::InvalidSessionIdError when quitting driver [Robin Daugherty]
+* Firefox: Don't click input when sending keys if already focused
+* Miscellaneous issues with selenium-webdriver 4.0.0.alphas
+* Nil return error in node details optimizations
+* Animation disabler now inserts XHTML compliant content [Dale Morgan]
+
 # Version 3.34.0
 Release date: 2020-11-26
 
@@ -7,7 +71,7 @@ Release date: 2020-11-26
 * Current path assertions/expectations accept optional filter block
 * Animation disabler now specifies `scroll-behavior: auto;` [Nathan Broadbent]
 * :button selector can now find elements by label text [Sean Doyle]
-* `Session#send_keys` to send keys to the current element with focus in drivers that support the 
+* `Session#send_keys` to send keys to the current element with focus in drivers that support the
   concept of a current element [Sean Doyle]
 
 ### Changed
@@ -21,7 +85,7 @@ Release date: 2020-11-26
 * Missing `readonly?` added to Node::Simple
 * Selenium version detection when loaded via alternate method [Joel Hawksley]
 * Connection count issue if REQUEST_URI value changed by app [Blake Williams]
-* Maintain URI fragment when redirecting in rack-test driver 
+* Maintain URI fragment when redirecting in rack-test driver
 * Text query error message [Wojciech Wnętrzak]
 * Checking a checkbox/radio button with `allow_label_click` now works if there are multiple labels (Issue #2421)
 * `drop` with `Pathname` (Issue #2424)[Máximo Mussini]
@@ -1859,4 +1923,3 @@ too many users, please read the release notes carefully!
 * clicking links where the image's alt attribute contains the text is now possible
 * within_fieldset and within_table work when the default selector is CSS
 * boolean attributes work the same across drivers (return true/false)
-

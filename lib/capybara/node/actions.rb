@@ -92,8 +92,9 @@ module Capybara
       end
 
       # @!macro label_click
-      #   @option options [Boolean] allow_label_click
+      #   @option options [Boolean, Hash] allow_label_click
       #     Attempt to click the label to toggle state if element is non-visible. Defaults to {Capybara.configure automatic_label_click}.
+      #     If set to a Hash it is passed as options to the `click` on the label
 
       ##
       #
@@ -277,7 +278,7 @@ module Capybara
       # @return [Capybara::Node::Element]  The file field element
       def attach_file(locator = nil, paths, make_visible: nil, **options) # rubocop:disable Style/OptionalArguments
         if locator && block_given?
-          raise ArgumentError, '``#attach_file` does not support passing both a locator and a block'
+          raise ArgumentError, '`#attach_file` does not support passing both a locator and a block'
         end
 
         Array(paths).each do |path|
@@ -314,7 +315,7 @@ module Capybara
 
           begin
             find(:datalist_input, from, **options)
-          rescue Capybara::ElementNotFound => dlinput_error # rubocop:disable Naming/RescuedExceptionsVariableName
+          rescue Capybara::ElementNotFound => dlinput_error
             raise Capybara::ElementNotFound, "#{select_error.message} and #{dlinput_error.message}"
           end
         end
@@ -371,7 +372,11 @@ module Capybara
 
           begin
             el ||= find(selector, locator, **options.merge(visible: :all))
-            el.session.find(:label, for: el, visible: true, match: :first).click unless el.checked? == checked
+            unless el.checked? == checked
+              el.session
+                .find(:label, for: el, visible: true, match: :first)
+                .click(**(Hash.try_convert(allow_label_click) || {}))
+            end
           rescue StandardError # swallow extra errors - raise original
             raise e
           end

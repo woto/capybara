@@ -53,8 +53,8 @@ class TestApp < Sinatra::Base
 
   get '/referer_base' do
     '<a href="/get_referer">direct link</a>' \
-    '<a href="/redirect_to_get_referer">link via redirect</a>' \
-    '<form action="/get_referer" method="get"><input type="submit"></form>'
+      '<a href="/redirect_to_get_referer">link via redirect</a>' \
+      '<form action="/get_referer" method="get"><input type="submit"></form>'
   end
 
   get '/redirect_to_get_referer' do
@@ -163,21 +163,30 @@ class TestApp < Sinatra::Base
 
   get '/with_title' do
     <<-HTML
-      <title>#{params[:title] || 'Test Title'}</title>
-      <body>
-        <svg><title>abcdefg</title></svg>
-      </body>
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
+          <title>#{params[:title] || 'Test Title'}</title>
+        </head>
+
+        <body>
+          <svg><title>abcdefg</title></svg>
+        </body>
+      </html>
     HTML
   end
 
   get '/download.csv' do
     content_type 'text/csv'
     'This, is, comma, separated' \
-    'Thomas, Walpole, was , here'
+      'Thomas, Walpole, was , here'
   end
 
   get '/:view' do |view|
-    erb view.to_sym, locals: { referrer: request.referrer }
+    view_template = "#{__dir__}/views/#{view}.erb"
+    has_layout = File.exist?(view_template) && File.open(view_template) { |f| f.first.downcase.include?('doctype') }
+    erb view.to_sym, locals: { referrer: request.referrer }, layout: !has_layout
   end
 
   post '/form' do

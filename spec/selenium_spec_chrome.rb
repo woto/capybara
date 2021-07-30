@@ -12,46 +12,63 @@ Selenium::WebDriver::Chrome.path = '/usr/bin/google-chrome-beta' if ENV['CI'] &&
 
 browser_options = ::Selenium::WebDriver::Chrome::Options.new
 browser_options.headless! if ENV['HEADLESS']
-browser_options.add_option(:w3c, ENV['W3C'] != 'false')
+
 # Chromedriver 77 requires setting this for headless mode on linux
 # Different versions of Chrome/selenium-webdriver require setting differently - jus set them all
 browser_options.add_preference('download.default_directory', Capybara.save_path)
 browser_options.add_preference(:download, default_directory: Capybara.save_path)
 
 Capybara.register_driver :selenium_chrome do |app|
-  Capybara::Selenium::Driver.new(app, browser: :chrome, options: browser_options, timeout: 30).tap do |driver|
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
+  driver_options = { browser: :chrome, timeout: 30 }.tap do |opts|
+    opts[options_key] = browser_options
+  end
+
+  Capybara::Selenium::Driver.new(app, **driver_options).tap do |driver|
     # Set download dir for Chrome < 77
     driver.browser.download_path = Capybara.save_path
   end
 end
 
 Capybara.register_driver :selenium_chrome_not_clear_storage do |app|
-  chrome_options = {
-    browser: :chrome,
-    options: browser_options
-  }
-  Capybara::Selenium::Driver.new(app, **chrome_options.merge(clear_local_storage: false, clear_session_storage: false))
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
+  chrome_options = { browser: :chrome, clear_local_storage: false, clear_session_storage: false }.tap do |opts|
+    opts[options_key] = browser_options
+  end
+
+  Capybara::Selenium::Driver.new(app, **chrome_options)
 end
 
 Capybara.register_driver :selenium_chrome_not_clear_session_storage do |app|
-  chrome_options = {
-    browser: :chrome,
-    options: browser_options
-  }
-  Capybara::Selenium::Driver.new(app, **chrome_options.merge(clear_session_storage: false))
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
+  chrome_options = { browser: :chrome, clear_session_storage: false }.tap do |opts|
+    opts[options_key] = browser_options
+  end
+
+  Capybara::Selenium::Driver.new(app, **chrome_options)
 end
 
 Capybara.register_driver :selenium_chrome_not_clear_local_storage do |app|
-  chrome_options = {
-    browser: :chrome,
-    options: browser_options
-  }
-  Capybara::Selenium::Driver.new(app, **chrome_options.merge(clear_local_storage: false))
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
+  chrome_options = { browser: :chrome, clear_local_storage: false }.tap do |opts|
+    opts[options_key] = browser_options
+  end
+  Capybara::Selenium::Driver.new(app, **chrome_options)
 end
 
 Capybara.register_driver :selenium_driver_subclass_with_chrome do |app|
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
   subclass = Class.new(Capybara::Selenium::Driver)
-  subclass.new(app, browser: :chrome, options: browser_options, timeout: 30)
+  chrome_options = { browser: :chrome, timeout: 30 }.tap do |opts|
+    opts[options_key] = browser_options
+  end
+
+  subclass.new(app, **chrome_options)
 end
 
 module TestSessions
@@ -68,10 +85,6 @@ Capybara::SpecHelper.run_specs TestSessions::Chrome, CHROME_DRIVER.to_s, capybar
     skip 'Need to figure out testing of file downloading on windows platform' if Gem.win_platform?
   when /Capybara::Session selenium_chrome Capybara::Window#maximize/
     pending "Chrome headless doesn't support maximize" if ENV['HEADLESS']
-  when /Capybara::Window#fullscreen should be able to fullscreen the window/
-    skip 'Chromedriver hangs on attempts to fullscreen in headless mode' if ENV['HEADLESS']
-  when /node #right_click delay should delay the mouse up/
-    skip "Legacy selenium doesn't support separate right button down/up" if ENV['W3C'] == 'false'
   end
 end
 
@@ -168,10 +181,7 @@ RSpec.describe 'Capybara::Session with chrome' do
   end
 
   describe 'log access' do
-    before { skip 'Only makes sense in W3C mode' if ENV['W3C'] == 'false' }
-
     it 'does not error getting log types' do
-      skip if Gem::Version.new(session.driver.browser.capabilities['chrome']['chromedriverVersion'].split[0]) < Gem::Version.new('75.0.3770.90')
       expect do
         session.driver.browser.manage.logs.available_types
       end.not_to raise_error
@@ -182,5 +192,9 @@ RSpec.describe 'Capybara::Session with chrome' do
         session.driver.browser.manage.logs.get(:browser)
       end.not_to raise_error
     end
+  end
+
+  def chromedriver_version
+    Gem::Version.new(session.driver.browser.capabilities['chrome']['chromedriverVersion'].split[0])
   end
 end

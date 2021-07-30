@@ -7,9 +7,6 @@
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/jnicklas/capybara?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![SemVer](https://api.dependabot.com/badges/compatibility_score?dependency-name=capybara&package-manager=bundler&version-scheme=semver)](https://dependabot.com/compatibility-score.html?dependency-name=capybara&package-manager=bundler&version-scheme=semver)
 
-**Note** You are viewing the README for the development version of Capybara. If you are using the current release version
-you can find the README at https://github.com/teamcapybara/capybara/blob/3.34_stable/README.md
-
 Capybara helps you test web applications by simulating how a real user would
 interact with your app. It is agnostic about the driver running your tests and
 comes with Rack::Test and Selenium support built in. WebKit is supported
@@ -77,7 +74,7 @@ GitHub): http://groups.google.com/group/ruby-capybara
 
 ## <a name="setup"></a>Setup
 
-Capybara requires Ruby 2.5.0 or later. To install, add this line to your
+Capybara requires Ruby 2.6.0 or later. To install, add this line to your
 `Gemfile` and run `bundle install`:
 
 ```ruby
