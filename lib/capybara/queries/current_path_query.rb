@@ -29,16 +29,19 @@ module Capybara
                 expected = ::Addressable::URI.parse(@expected_path)
                 actual = ::Addressable::URI.parse(@actual_path)
 
+                expected_query_values = Rack::Utils.parse_nested_query(expected.query)
+                actual_query_values = Rack::Utils.parse_nested_query(actual.query)
+
                 expected_hash = {
                     :scheme => expected.scheme, :user => expected.user, :password => expected.password,
                     :host => expected.host, :port => expected.port, :path => expected.path,
-                    :query => expected.query_values, :fragment => expected.fragment
+                    :query => expected_query_values, :fragment => expected.fragment
                 }
 
                 actual_hash ={
                     :scheme => actual.scheme, :user => actual.user, :password => actual.password,
                     :host => actual.host, :port => actual.port, :path => actual.path,
-                    :query => actual.query_values, :fragment => actual.fragment
+                    :query => actual_query_values, :fragment => actual.fragment
                 }
 
                 expected_hash == actual_hash
