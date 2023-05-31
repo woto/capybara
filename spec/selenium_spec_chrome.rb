@@ -8,10 +8,15 @@ require 'rspec/shared_spec_matchers'
 
 CHROME_DRIVER = :selenium_chrome
 
-Selenium::WebDriver::Chrome.path = '/usr/bin/google-chrome-beta' if ENV['CI'] && ENV['CHROME_BETA']
+Selenium::WebDriver::Chrome.path = '/usr/bin/google-chrome-beta' if ENV.fetch('CI', nil) && ENV.fetch('CHROME_BETA', nil)
 
-browser_options = ::Selenium::WebDriver::Chrome::Options.new
-browser_options.headless! if ENV['HEADLESS']
+Selenium::WebDriver.logger.ignore(:selenium_manager)
+
+browser_options = if ENV['HEADLESS']
+  Selenium::WebDriver::Options.chrome(args: ['--headless=new'])
+else
+  Selenium::WebDriver::Options.chrome
+end
 
 # Chromedriver 77 requires setting this for headless mode on linux
 # Different versions of Chrome/selenium-webdriver require setting differently - jus set them all
@@ -83,8 +88,10 @@ Capybara::SpecHelper.run_specs TestSessions::Chrome, CHROME_DRIVER.to_s, capybar
   case example.metadata[:full_description]
   when /#click_link can download a file$/
     skip 'Need to figure out testing of file downloading on windows platform' if Gem.win_platform?
-  when /Capybara::Session selenium_chrome Capybara::Window#maximize/
-    pending "Chrome headless doesn't support maximize" if ENV['HEADLESS']
+  when /Capybara::Session selenium_chrome node #shadow_root should get visible text/
+    pending "Selenium doesn't currently support getting visible text for shadow root elements"
+  when /Capybara::Session selenium_chrome node #shadow_root/
+    skip 'Not supported with this chromedriver version' if chromedriver_lt?('96.0', @session)
   end
 end
 
@@ -181,20 +188,22 @@ RSpec.describe 'Capybara::Session with chrome' do
   end
 
   describe 'log access' do
+    let(:logs) do
+      session.driver.browser.then do |chrome_driver|
+        chrome_driver.respond_to?(:logs) ? chrome_driver : chrome_driver.manage
+      end.logs
+    end
+
     it 'does not error getting log types' do
       expect do
-        session.driver.browser.manage.logs.available_types
+        logs.available_types
       end.not_to raise_error
     end
 
     it 'does not error when getting logs' do
       expect do
-        session.driver.browser.manage.logs.get(:browser)
+        logs.get(:browser)
       end.not_to raise_error
     end
-  end
-
-  def chromedriver_version
-    Gem::Version.new(session.driver.browser.capabilities['chrome']['chromedriverVersion'].split[0])
   end
 end

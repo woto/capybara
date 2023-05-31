@@ -28,7 +28,7 @@ end
 
 Capybara.register_driver :selenium_ie do |app|
   # ::Selenium::WebDriver.logger.level = "debug"
-  options = ::Selenium::WebDriver::IE::Options.new
+  options = Selenium::WebDriver::IE::Options.new
   # options.require_window_focus = true
   # options.add_option("log", {"level": "trace"})
 
@@ -88,7 +88,7 @@ Capybara::SpecHelper.run_specs TestSessions::SeleniumIE, 'selenium', capybara_sk
     pending "Window 7 and 8.1 don't support 308 http status code"
   when /#scroll_to can scroll an element to the center of the viewport$/,
        /#scroll_to can scroll an element to the center of the scrolling element$/
-    pending " IE doesn't support ScrollToOptions"
+    pending "IE doesn't support ScrollToOptions"
   when /#attach_file with multipart form should fire change once for each set of files uploaded$/,
        /#attach_file with multipart form should fire change once when uploading multiple files from empty$/,
        /#attach_file with multipart form should not break when using HTML5 multiple file input uploading multiple files$/
@@ -103,11 +103,13 @@ Capybara::SpecHelper.run_specs TestSessions::SeleniumIE, 'selenium', capybara_sk
   when /#attach_file with a block/
     skip 'Hangs IE testing for unknown reason'
   when /drag_to.*HTML5/
-    pending "IE doesn't support a DataTransfer constuctor"
+    pending "IE doesn't support a DataTransfer constructor"
   when /template elements should not be visible/
     skip "IE doesn't support template elements"
   when /Element#drop/
     pending "IE doesn't support DataTransfer constructor"
+  when /Capybara::Session selenium_chrome node #shadow_root should get visible text/
+    pending "Selenium doesn't currently support getting visible text for shadow root elements"
   end
 end
 

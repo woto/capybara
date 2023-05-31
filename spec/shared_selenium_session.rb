@@ -23,7 +23,7 @@ RSpec.shared_examples 'Capybara::Session' do |session, mode|
       it 'freshly reset session should not be touched' do
         session.instance_variable_set(:@touched, true)
         session.reset!
-        expect(session.instance_variable_get(:@touched)).to eq false
+        expect(session.instance_variable_get(:@touched)).to be false
       end
     end
 
@@ -74,7 +74,6 @@ RSpec.shared_examples 'Capybara::Session' do |session, mode|
 
     describe '#fill_in_with empty string and no options' do
       it 'should trigger change when clearing a field' do
-        pending "safaridriver doesn't trigger change for clear" if safari?(session)
         session.visit('/with_js')
         session.fill_in('with_change_event', with: '')
         # click outside the field to trigger the change event
@@ -188,14 +187,12 @@ RSpec.shared_examples 'Capybara::Session' do |session, mode|
 
       it 'should generate standard events on changing value' do
         pending "IE 11 doesn't support date input type" if ie?(session)
-        pending "Safari doesn't support date input type" if safari?(session)
         session.fill_in('form_date', with: Date.today)
         expect(session.evaluate_script('window.capybara_formDateFiredEvents')).to eq %w[focus input change]
       end
 
       it 'should not generate input and change events if the value is not changed' do
         pending "IE 11 doesn't support date input type" if ie?(session)
-        pending "Safari doesn't support date input type" if safari?(session)
         session.fill_in('form_date', with: Date.today)
         session.fill_in('form_date', with: Date.today)
         # Chrome adds an extra focus for some reason - ok for now
@@ -223,14 +220,14 @@ RSpec.shared_examples 'Capybara::Session' do |session, mode|
     end
 
     describe '#send_keys' do
-      it 'defaults to sending keys to the document.activeElement' do
+      it 'defaults to sending keys to the active_element' do
         session.visit('/form')
 
-        expect(session.evaluate_script('document.activeElement')).to eq(session.find('//body'))
+        expect(session.active_element).to match_selector(:css, 'body')
 
         session.send_keys(:tab)
 
-        expect(session.evaluate_script('document.activeElement')).to eq(session.first(:field))
+        expect(session.active_element).to match_selector(:css, '[tabindex="1"]')
       end
     end
 
@@ -281,6 +278,13 @@ RSpec.shared_examples 'Capybara::Session' do |session, mode|
         session.visit('/form')
         element = session.evaluate_script("document.getElementById('form_title')")
         expect(element).to eq session.find(:id, 'form_title')
+      end
+
+      it 'returns a shadow root' do
+        session.visit('/with_shadow')
+        shadow = session.find(:css, '#shadow_host')
+        element = session.evaluate_script('arguments[0].shadowRoot', shadow)
+        expect(element).to be_instance_of(Capybara::Node::Element)
       end
 
       it 'can return arrays of nested elements' do
@@ -339,17 +343,15 @@ RSpec.shared_examples 'Capybara::Session' do |session, mode|
       it 'can attach a directory' do
         pending "Geckodriver doesn't support uploading a directory" if firefox?(session)
         pending "Selenium remote doesn't support transferring a directory" if remote?(session)
-        pending "Headless Chrome doesn't support directory upload - https://bugs.chromium.org/p/chromedriver/issues/detail?id=2521&q=directory%20upload&colspec=ID%20Status%20Pri%20Owner%20Summary" if chrome?(session) && ENV['HEADLESS']
+        pending "Headless Chrome doesn't support directory upload - https://bugs.chromium.org/p/chromedriver/issues/detail?id=2521&q=directory%20upload&colspec=ID%20Status%20Pri%20Owner%20Summary" if chrome?(session) && chrome_lt?(110, session) && ENV.fetch('HEADLESS', nil)
         pending "IE doesn't support uploading a directory" if ie?(session)
         pending 'Chrome/chromedriver 73 breaks this' if chrome?(session) && chrome_gte?(73, session) && chrome_lt?(75, session)
-        pending "Safari doesn't support uploading a directory" if safari?(session)
-        # pending "Edge/msedgedriver doesn't support directory upload" if edge?(session) && edge_gte?(75, session)
 
         session.visit('/form')
         test_file_dir = File.expand_path('./fixtures', File.dirname(__FILE__))
         session.attach_file('Directory Upload', test_file_dir)
         session.click_button('Upload Multiple')
-        expect(session.body).to include('5 | ') # number of files
+        expect(session).to have_text('5 | ') # number of files
       end
 
       it 'can attach a relative file' do
@@ -358,7 +360,7 @@ RSpec.shared_examples 'Capybara::Session' do |session, mode|
         session.visit('/form')
         session.attach_file('Single Document', 'spec/fixtures/capybara.csv')
         session.click_button('Upload Single')
-        expect(session.body).to include('Content-type: text/csv')
+        expect(session).to have_text('Content-type: text/csv')
       end
     end
 
@@ -379,6 +381,12 @@ RSpec.shared_examples 'Capybara::Session' do |session, mode|
           # it doesn't affect any of these tests because the settings are applied per-session
           Capybara.disable_animation = true
           @animation_session = Capybara::Session.new(session.mode, TestApp.new)
+        end
+
+        it 'should add CSS to the <head> element' do
+          @animation_session.visit('with_animation')
+
+          expect(@animation_session).to have_selector(:css, 'head > style', text: 'transition: none', visible: :hidden)
         end
 
         it 'should disable CSS transitions' do

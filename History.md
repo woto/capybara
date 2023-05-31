@@ -1,13 +1,109 @@
-# Version 3.36.0
+#Version 3.40.0
 Release date: unreleased
 
 ### Changed
 
-* Ruby 2.6.0+ is now required
+* Dropped support for Ruby 2.7, 3.0+ is now required
+* Dropped support for Selenium < 4.1
+
+# Version 3.39.1
+Release date: 2023-05-12
+
+### Fixed
+
+* Fix usage of Selenium logger
+
+# Version 3.39.0
+Release date: 2023-04-02
 
 ### Added
 
+* Support `:target` filter option on `:link` selector [Yudai Takada]
+* Experimental Rack 3 support
+* Text normalization performance improvements [Brandon Weaver]
+
+### Fixed
+
+* MS Edge button click [Brian J. Bayer]
+* Options/Capabilities choosing based on Selenium versions
+* Support for base versions [Matijs van Zuijlen]
+* ExpectedError not defined in Selenium 4+
+* Filter block forwarding to a number of matchers [Christophe Bliard]
+###  Changed
+
+* Dropped support for rack 1.x
+
+# Version 3.38.0
+Release date: 2022-11-03
+
+### Changed
+
+* Capybara.w3c_click_offset now defaults to true. If you need click offsets to be from the elements top left corner set it to false in your config
+
+### Added
+
+* Support Selenium 4.3 changes to click offset calculations
+* `click`, `double_click`, `right_click` can now be called on the session to click the currently scoped element (or document)
+* `Session#within` now passes the scoped element to the block
+* Support rack-test 2+
+* Retry interval is now configurable [Masahiro NOMOTO]
+* Support Puma 6 - Issue #2590
+* Selenium: DetachedShadowRootError is treated as an invalid element error [Perryn Fowler]
+* Selenium: When inspected shadow roots will have a tag name of "ShadowRoot"
+* `evaluate_async_script` added to Session::DSL_METHODS [Henry Blyth]
+
+### Fixed
+
+* Use higher precision clock in Capybara::Helpers::Timer if available
+* rack-test driver behavior with \r\n - Issue #2547 [Stefan Hoffmann]
+* Updated for deprecation of positional parameters in Selenium::WebDriver::ActionBuilder#pause
+* Explicitly set cause on server raised errors
+* Options no longer duplicated in have_xxx invalid option error message [Yudai Takada]
+* Animation disabler is now threadsafe [Daniel Sheppard]
+* Server connection count tracking [Oleksandr K.]
+* Ensure scopes are reset when session is [Henry Blyth]
+
+# Version 3.37.1
+Release date: 2022-05-09
+
+### Fixed
+
+* Regression in rack-test visit - Issue #2548
+
+# Version 3.37.0
+Release date: 2022-05-07
+
+### Changed
+
+* Ruby 2.7.0+ is now required
+
+### Added
+
+* [Beta] CSP nonces inserted into animation disabler additions - Issue #2542
+* Support `<base>` element in rack-test driver - ISsue #2544
+* [Beta] `Element#shadow_root` support. Requires selenium-webdriver 4.1+. Only currently supported with Chrome when using the selenium driver. Note: only CSS can be used to find elements from the shadow root. Therefore you won't be able to use most Capybara helper methods (`fill_in`, `click_link`, `find_field`, etc) directly from the shadow root since those locators are built using XPath. If you first locate a descendant from the shadow root using CSS then you should be able to use all the Capybara methods from there.
+* Regexp now supported for `exact_text` finder option
+
+### Fixed
+
+* Fragments in referer headers in rack-test driver - Issue #2525
+* Selenium v4.1 deprecation notice
+
+# Version 3.36.0
+Release date: 2021-10-24
+
+### Changed
+
+* Ruby 2.6.0+ is now required
+* Minimum selenium-webdriver supported is now 3.142.7
+
+### Added
+
+* Support for selenium-webdriver 4.x
 * `allow_label_click` accepts click options to be used when clicking an associated label
+* Deprecated `allow_gumbo=` in favor of `use_html5_parsing=` to enable use of Nokogiri::HTML5 when available
+* `Session#active_element` returns the element with focus - Not supported by the `RackTest` driver [Sean Doyle]
+* Support `focused:` filter for finding interactive elements - Not supported by the `RackTest` driver [Sean Doyle]
 
 ### Fixed
 
@@ -16,7 +112,8 @@ Release date: unreleased
 * `Node#all_text` always returns a string - Issue #2477
 * `have_any_of_selectors` negated match - Issue #2473
 * `Document#scroll_to` fixed for standards behavior - pass quirks: true if you need the older behavior [Eric Anderson]
-
+* Use capture on attach file event listener for better React compatibility [Jeff Way]
+* Animation disabler produces valid HTML [Javi Martin]
 
 ### Removed
 
@@ -778,7 +875,7 @@ Release date: 2018-03-23
 
 ### Changed
 
-* Visibile text whitespace is no longer fully normalized in favor of being more in line with the WebDriver spec for visible text
+* Visible text whitespace is no longer fully normalized in favor of being more in line with the WebDriver spec for visible text
 * Drivers are expected to close extra windows when resetting the session
 * Selenium driver supports Date/Time when filling in date/time/datetime-local inputs
 * `current_url` returns the url for the top level browsing context
@@ -1184,7 +1281,7 @@ Release date: 2016-01-27
 
 # Version 2.6.0
 
-Relase date: 2016-01-17
+Release date: 2016-01-17
 
 ### Fixed
 
@@ -1248,7 +1345,7 @@ Release date: 2014-10-13
 
 # Version 2.4.3
 
-Relase date: 2014-09-21
+Release date: 2014-09-21
 
 ### Fixed
 

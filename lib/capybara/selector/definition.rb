@@ -203,7 +203,7 @@ module Capybara
 
       ##
       #
-      # Set the default visibility mode that shouble be used if no visibile option is passed when using the selector.
+      # Set the default visibility mode that should be used if no visible option is passed when using the selector.
       # If not specified will default to the behavior indicated by Capybara.ignore_hidden_elements
       #
       # @param [Symbol] default_visibility  Only find elements with the specified visibility:
@@ -261,7 +261,8 @@ module Capybara
       def parameter_names(block)
         key_types = %i[key keyreq]
         # user filter_map when we drop dupport for 2.6
-        block.parameters.select { |(type, _name)| key_types.include? type }.map { |(_, name)| name }
+        # block.parameters.select { |(type, _name)| key_types.include? type }.map { |(_, name)| name }
+        block.parameters.filter_map { |(type, name)| name if key_types.include? type }
       end
 
       def expression(type, allowed_filters, &block)

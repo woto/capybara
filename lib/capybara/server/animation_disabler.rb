@@ -16,48 +16,65 @@ module Capybara
 
       def initialize(app)
         @app = app
-        @disable_markup = format(DISABLE_MARKUP_TEMPLATE, selector: self.class.selector_for(Capybara.disable_animation))
+        @disable_css_markup = format(DISABLE_CSS_MARKUP_TEMPLATE,
+                                     selector: self.class.selector_for(Capybara.disable_animation))
+        @disable_js_markup = +DISABLE_JS_MARKUP_TEMPLATE
       end
 
       def call(env)
-        @status, @headers, @body = @app.call(env)
-        return [@status, @headers, @body] unless html_content?
+        status, headers, body = @app.call(env)
+        return [status, headers, body] unless html_content?(headers)
 
-        response = Rack::Response.new([], @status, @headers)
+        nonces = directive_nonces(headers).transform_values { |nonce| "nonce=\"#{nonce}\"" if nonce && !nonce.empty? }
+        response = Rack::Response.new([], status, headers)
 
-        @body.each { |html| response.write insert_disable(html) }
-        @body.close if @body.respond_to?(:close)
+        body.each { |html| response.write insert_disable(html, nonces) }
+        body.close if body.respond_to?(:close)
 
         response.finish
       end
 
     private
 
-      attr_reader :disable_markup
+      attr_reader :disable_css_markup, :disable_js_markup
 
-      def html_content?
-        /html/.match?(@headers['Content-Type'])
+      def html_content?(headers)
+        /html/.match?(headers['Content-Type']) # rubocop:todo Performance/StringInclude
       end
 
-      def insert_disable(html)
-        html.sub(%r{(</body>)}, "#{disable_markup}\\1")
+      def insert_disable(html, nonces)
+        html.sub(%r{(</head>)}, "<style #{nonces['style-src']}>#{disable_css_markup}</style>\\1")
+            .sub(%r{(</body>)}, "<script #{nonces['script-src']}>#{disable_js_markup}</script>\\1")
       end
 
-      DISABLE_MARKUP_TEMPLATE = <<~HTML
-        <script>
+      def directive_nonces(headers)
+        headers.fetch('Content-Security-Policy', '')
+               .split(';')
+               .map(&:split) # rubocop:disable Style/MapToHash
+               .to_h do |s|
+                 [
+                   s[0], s[1..].filter_map do |value|
+                     /^'nonce-(?<nonce>.+)'/ =~ value
+                     nonce
+                   end[0]
+                 ]
+               end
+      end
+
+      DISABLE_CSS_MARKUP_TEMPLATE = <<~CSS
+        %<selector>s, %<selector>s::before, %<selector>s::after {
+           transition: none !important;
+           animation-duration: 0s !important;
+           animation-delay: 0s !important;
+           scroll-behavior: auto !important;
+        }
+      CSS
+
+      DISABLE_JS_MARKUP_TEMPLATE = <<~SCRIPT
         //<![CDATA[
           (typeof jQuery !== 'undefined') && (jQuery.fx.off = true);
         //]]>
-        </script>
-        <style>
-          %<selector>s, %<selector>s::before, %<selector>s::after {
-             transition: none !important;
-             animation-duration: 0s !important;
-             animation-delay: 0s !important;
-             scroll-behavior: auto !important;
-          }
-        </style>
-      HTML
+      SCRIPT
     end
   end
 end

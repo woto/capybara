@@ -11,12 +11,12 @@ end
 
 feature 'if fscenario aliases focused tag then' do
   fscenario 'scenario should have focused meta tag' do |example| # rubocop:disable RSpec/Focus
-    expect(example.metadata[:focus]).to eq true
+    expect(example.metadata[:focus]).to be true
   end
 end
 
 feature 'if xscenario aliases to pending then' do
-  xscenario "this test should be 'temporarily disabled with xscenario'" do
+  xscenario "this test should be 'temporarily disabled with xscenario'" do # rubocop:disable RSpec/PendingWithoutReason
   end
 end
 

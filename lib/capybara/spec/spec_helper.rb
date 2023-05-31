@@ -24,6 +24,7 @@ module Capybara
         Capybara.app_host = nil
         Capybara.default_selector = :xpath
         Capybara.default_max_wait_time = 1
+        Capybara.default_retry_interval = 0.01
         Capybara.ignore_hidden_elements = true
         Capybara.exact = false
         Capybara.raise_server_errors = true
@@ -36,8 +37,8 @@ module Capybara
         Capybara.test_id = nil
         Capybara.predicates_wait = true
         Capybara.default_normalize_ws = false
-        Capybara.allow_gumbo = true
-        Capybara.w3c_click_offset = false
+        Capybara.use_html5_parsing = !ENV['HTML5_PARSING'].nil?
+        Capybara.w3c_click_offset = true
         reset_threadsafe
       end
 
@@ -120,6 +121,11 @@ module Capybara
       perms = [(::Sinatra::IndifferentHash if defined? ::Sinatra::IndifferentHash)].compact
       results = Capybara::HTML(session.body).xpath("//pre[@id='results']").first.inner_html.lstrip
       YAML.safe_load results, permitted_classes: perms
+    end
+
+    def extract_content_type(session)
+      expect(session).to have_xpath("//pre[@id='content_type']")
+      Capybara::HTML(session.body).xpath("//pre[@id='content_type']").first.text
     end
 
     def be_an_invalid_element_error(session)

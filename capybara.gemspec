@@ -8,29 +8,32 @@ require 'capybara/version'
 Gem::Specification.new do |s|
   s.name = 'capybara'
   s.version = Capybara::VERSION
-  s.required_ruby_version = '>= 2.6.0'
+  s.required_ruby_version = '>= 3.0.0'
   s.license = 'MIT'
 
   s.authors = ['Thomas Walpole', 'Jonas Nicklas']
   s.email = ['twalpole@gmail.com', 'jonas.nicklas@gmail.com']
-  s.description = 'Capybara is an integration testing tool for rack based web applications. '\
+  s.description = 'Capybara is an integration testing tool for rack based web applications. ' \
                   'It simulates how a user would interact with a website'
 
+  # Test files are included in the gem to allow third-party driver packages to
+  # run the Capybara test suite and ensure compatibility.
   s.files = Dir.glob('{lib,spec}/**/*') + %w[README.md History.md License.txt .yardopts]
 
   s.homepage = 'https://github.com/teamcapybara/capybara'
   s.metadata = {
     'changelog_uri' => 'https://github.com/teamcapybara/capybara/blob/master/History.md',
-    'source_code_uri' => 'https://github.com/teamcapybara/capybara'
+    'source_code_uri' => 'https://github.com/teamcapybara/capybara',
+    'rubygems_mfa_required' => 'true'
   }
   s.require_paths = ['lib']
-  s.summary = 'Capybara aims to simplify the process of integration testing Rack applications, '\
+  s.summary = 'Capybara aims to simplify the process of integration testing Rack applications, ' \
               'such as Rails, Sinatra or Merb'
 
   s.add_runtime_dependency('addressable')
   s.add_runtime_dependency('matrix')
   s.add_runtime_dependency('mini_mime', ['>= 0.1.3'])
-  s.add_runtime_dependency('nokogiri', ['~> 1.8'])
+  s.add_runtime_dependency('nokogiri', ['~> 1.11'])
   s.add_runtime_dependency('rack', ['>= 1.6.0'])
   s.add_runtime_dependency('rack-test', ['>= 0.6.3'])
   s.add_runtime_dependency('regexp_parser', ['>=1.5', '<3.0'])
@@ -54,10 +57,9 @@ Gem::Specification.new do |s|
   s.add_development_dependency('rubocop-rspec', ['~>2.0'])
   s.add_development_dependency('sauce_whisk')
   s.add_development_dependency('selenium_statistics')
-  s.add_development_dependency('selenium-webdriver', ['~>3.5'])
+  s.add_development_dependency('selenium-webdriver', ['~>4.1'])
   s.add_development_dependency('sinatra', ['>= 1.4.0'])
   s.add_development_dependency('uglifier')
-  s.add_development_dependency('webdrivers', ['>=3.6.0']) # if ENV['CI']
   s.add_development_dependency('yard', ['>= 0.9.0'])
 
   if RUBY_ENGINE == 'rbx'
@@ -66,6 +68,8 @@ Gem::Specification.new do |s|
     s.add_development_dependency('rubysl')
   end
 
-  s.signing_key = 'gem-private_key.pem' if File.exist?('gem-private_key.pem')
-  s.cert_chain = ['gem-public_cert.pem']
+  if File.exist?('gem-private_key.pem')
+    s.signing_key = 'gem-private_key.pem'
+    s.cert_chain = ['gem-public_cert.pem']
+  end
 end

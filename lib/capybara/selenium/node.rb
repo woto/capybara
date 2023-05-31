@@ -4,22 +4,22 @@
 
 require 'capybara/selenium/extensions/find'
 require 'capybara/selenium/extensions/scroll'
+require 'capybara/node/whitespace_normalizer'
 
 class Capybara::Selenium::Node < Capybara::Driver::Node
+  include Capybara::Node::WhitespaceNormalizer
   include Capybara::Selenium::Find
   include Capybara::Selenium::Scroll
 
   def visible_text
+    raise NotImplementedError, 'Getting visible text is not currently supported directly on shadow roots' if shadow_root?
+
     native.text
   end
 
   def all_text
     text = driver.evaluate_script('arguments[0].textContent', self) || ''
-    text.gsub(/[\u200b\u200e\u200f]/, '')
-        .gsub(/[\ \n\f\t\v\u2028\u2029]+/, ' ')
-        .gsub(/\A[[:space:]&&[^\u00a0]]+/, '')
-        .gsub(/[[:space:]&&[^\u00a0]]+\z/, '')
-        .tr("\u00a0", ' ')
+    normalize_spacing(text)
   end
 
   def [](name)
@@ -37,9 +37,7 @@ class Capybara::Selenium::Node < Capybara::Driver::Node
   end
 
   def style(styles)
-    styles.each_with_object({}) do |style, result|
-      result[style] = native.css_value(style)
-    end
+    styles.to_h { |style| [style, native.css_value(style)] }
   end
 
   ##
@@ -53,6 +51,11 @@ class Capybara::Selenium::Node < Capybara::Driver::Node
   #   :none =>  append the new value to the existing value <br/>
   #   :backspace => send backspace keystrokes to clear the field <br/>
   #   Array => an array of keys to send before the value being set, e.g. [[:command, 'a'], :backspace]
+  # @option options [Boolean] :rapid (nil) Whether setting text inputs should use a faster &quot;rapid&quot; mode<br/>
+  #   nil => Text inputs with length greater than 30 characters will be set using a faster driver script mode<br/>
+  #   true => Rapid mode will be used regardless of input length<br/>
+  #   false => Sends keys via conventional mode. This may be required to avoid losing key-presses if you have certain
+  #            Javascript interactions on form inputs<br/>
   def set(value, **options)
     if value.is_a?(Array) && !multiple?
       raise ArgumentError, "Value cannot be an Array when 'multiple' attribute is not present. Not a #{value.class}"
@@ -110,11 +113,7 @@ class Capybara::Selenium::Node < Capybara::Driver::Node
         action.click(target)
       else
         action.click_and_hold(target)
-        if w3c?
-          action.pause(action.pointer_inputs.first, click_options.delay)
-        else
-          action.pause(click_options.delay)
-        end
+        action_pause(action, click_options.delay)
         action.release
       end
     end
@@ -135,9 +134,9 @@ class Capybara::Selenium::Node < Capybara::Driver::Node
         action.context_click(target)
       elsif w3c?
         action.move_to(target) if target
-        action.pointer_down(:right)
-              .pause(action.pointer_inputs.first, click_options.delay)
-              .pointer_up(:right)
+        action.pointer_down(:right).then do |act|
+          action_pause(act, click_options.delay)
+        end.pointer_up(:right)
       else
         raise ArgumentError, 'Delay is not supported when right clicking with legacy (non-w3c) selenium driver'
       end
@@ -179,7 +178,12 @@ class Capybara::Selenium::Node < Capybara::Driver::Node
   end
 
   def tag_name
-    @tag_name ||= native.tag_name.downcase
+    @tag_name ||=
+      if native.respond_to? :tag_name
+        native.tag_name.downcase
+      else
+        shadow_root? ? 'ShadowRoot' : 'Unknown'
+      end
   end
 
   def visible?; boolean_attr(native.displayed?); end
@@ -214,6 +218,11 @@ class Capybara::Selenium::Node < Capybara::Driver::Node
     native.rect
   end
 
+  def shadow_root
+    root = native.shadow_root
+    root && build_node(native.shadow_root)
+  end
+
 protected
 
   def scroll_if_needed
@@ -224,7 +233,7 @@ protected
   end
 
   def scroll_to_center
-    script = <<-'JS'
+    script = <<-JS
       try {
         arguments[0].scrollIntoView({behavior: 'instant', block: 'center', inline: 'center'});
       } catch(e) {
@@ -403,10 +412,26 @@ private
 
   def action_with_modifiers(click_options)
     actions = browser_action.tap do |acts|
-      if click_options.center_offset? && click_options.coords?
-        acts.move_to(native).move_by(*click_options.coords)
+      if click_options.coords?
+        if click_options.center_offset?
+          if Selenium::WebDriver::VERSION.to_f >= 4.3
+            acts.move_to(native, *click_options.coords)
+          else
+            acts.move_to(native).move_by(*click_options.coords)
+          end
+        elsif Selenium::WebDriver::VERSION.to_f >= 4.3
+          right_by, down_by = *click_options.coords
+          size = native.size
+          left_offset = (size[:width] / 2).to_i
+          top_offset = (size[:height] / 2).to_i
+          left = -left_offset + right_by
+          top = -top_offset + down_by
+          acts.move_to(native, left, top)
+        else
+          acts.move_to(native, *click_options.coords)
+        end
       else
-        acts.move_to(native, *click_options.coords)
+        acts.move_to(native)
       end
     end
     modifiers_down(actions, click_options.keys)
@@ -449,6 +474,18 @@ private
       capabilities.is_a?(::Selenium::WebDriver::Remote::W3C::Capabilities)
   end
 
+  def action_pause(action, duration)
+    if w3c?
+      if Selenium::WebDriver::VERSION.to_f >= 4.2
+        action.pause(device: action.pointer_inputs.first, duration: duration)
+      else
+        action.pause(action.pointer_inputs.first, duration)
+      end
+    else
+      action.pause(duration)
+    end
+  end
+
   def normalize_keys(keys)
     keys.map do |key|
       case key
@@ -475,13 +512,23 @@ private
   def attrs(*attr_names)
     return attr_names.map { |name| self[name.to_s] } if ENV['CAPYBARA_THOROUGH']
 
-    driver.evaluate_script <<~'JS', self, attr_names.map(&:to_s)
+    driver.evaluate_script <<~JS, self, attr_names.map(&:to_s)
       (function(el, names){
         return names.map(function(name){
           return el[name]
         });
       })(arguments[0], arguments[1]);
     JS
+  end
+
+  def native_id
+    # Selenium 3 -> 4 changed the return of ref
+    type_or_id, id = native.ref
+    id || type_or_id
+  end
+
+  def shadow_root?
+    defined?(::Selenium::WebDriver::ShadowRoot) && native.is_a?(::Selenium::WebDriver::ShadowRoot)
   end
 
   GET_XPATH_SCRIPT = <<~'JS'
@@ -516,7 +563,7 @@ private
     })(arguments[0], document)
   JS
 
-  OBSCURED_OR_OFFSET_SCRIPT = <<~'JS'
+  OBSCURED_OR_OFFSET_SCRIPT = <<~JS
     (function(el, x, y) {
       var box = el.getBoundingClientRect();
       if (x == null) x = box.width/2;
@@ -533,7 +580,7 @@ private
     })(arguments[0], arguments[1], arguments[2])
   JS
 
-  RAPID_APPEND_TEXT = <<~'JS'
+  RAPID_APPEND_TEXT = <<~JS
     (function(el, value) {
       value = el.value + value;
       if (el.maxLength && el.maxLength != -1){

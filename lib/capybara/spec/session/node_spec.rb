@@ -157,6 +157,12 @@ Capybara::SpecHelper.spec 'node' do
         expect(@session.find(:css, '#existing_content_editable_child_parent').text).to eq("Some content\nWYSIWYG")
       end
     end
+
+    it 'should submit single text input forms if ended with \n' do
+      @session.visit('/form')
+      @session.find(:css, '#single_input').set("my entry\n")
+      expect(extract_results(@session)['single_input']).to eq('my entry')
+    end
   end
 
   describe '#tag_name' do
@@ -651,6 +657,16 @@ Capybara::SpecHelper.spec 'node' do
           expect(target).to have_text(%r{^HTML5 Dropped string: text/plain drag_html5-#{key}$}m, exact: true)
         end
       end
+
+      it 'should trigger a dragenter event, before the first dragover event' do
+        @session.visit('/with_js')
+        element = @session.find('//div[@id="drag_html5"]')
+        target = @session.find('//div[@id="drop_html5"]')
+        element.drag_to(target)
+
+        # Events are listed in reverse chronological order
+        expect(@session).to have_text(/DragOver.*DragEnter/m)
+      end
     end
   end
 
@@ -775,6 +791,7 @@ Capybara::SpecHelper.spec 'node' do
     end
 
     it 'should allow to adjust the click offset', requires: [:js] do
+      Capybara.w3c_click_offset = false
       @session.visit('with_js')
       @session.find(:css, '#click-test').click(x: 5, y: 5)
       link = @session.find(:link, 'has-been-clicked')
@@ -901,6 +918,7 @@ Capybara::SpecHelper.spec 'node' do
     end
 
     it 'should allow to adjust the offset', requires: [:js] do
+      Capybara.w3c_click_offset = false
       @session.visit('with_js')
       @session.find(:css, '#click-test').double_click(x: 10, y: 5)
       link = @session.find(:link, 'has-been-double-clicked')
@@ -987,6 +1005,7 @@ Capybara::SpecHelper.spec 'node' do
     end
 
     it 'should allow to adjust the offset', requires: [:js] do
+      Capybara.w3c_click_offset = false
       @session.visit('with_js')
       @session.find(:css, '#click-test').right_click(x: 10, y: 10)
       link = @session.find(:link, 'has-been-right-clicked')
@@ -1115,7 +1134,7 @@ Capybara::SpecHelper.spec 'node' do
   end
 
   describe '#evaluate_script', requires: %i[js es_args] do
-    it 'should evaluate the given script in the context of the element and  return whatever it produces' do
+    it 'should evaluate the given script in the context of the element and return whatever it produces' do
       @session.visit('/with_js')
       el = @session.find(:css, '#with_change_event')
       expect(el.evaluate_script('this.value')).to eq('default value')
@@ -1173,6 +1192,68 @@ Capybara::SpecHelper.spec 'node' do
       change = @session.find(:css, '#change') # ensure page has loaded and element is available
       el = change.evaluate_async_script('var cb = arguments[0]; setTimeout(function(el){ cb(el) }, 100, this)')
       expect(el).to eq(change)
+    end
+  end
+
+  describe '#shadow_root', requires: %i[js] do
+    it 'should get the shadow root' do
+      @session.visit('/with_shadow')
+      expect do
+        shadow_root = @session.find(:css, '#shadow_host').shadow_root
+        expect(shadow_root).to be_a(Capybara::Node::Element)
+      end.not_to raise_error
+    end
+
+    it 'should find elements inside the shadow dom using CSS' do
+      @session.visit('/with_shadow')
+      shadow_root = @session.find(:css, '#shadow_host').shadow_root
+      expect(shadow_root).to have_css('#shadow_content', text: 'some text')
+    end
+
+    it 'should find nested shadow roots' do
+      @session.visit('/with_shadow')
+      shadow_root = @session.find(:css, '#shadow_host').shadow_root
+      nested_shadow_root = shadow_root.find(:css, '#nested_shadow_host').shadow_root
+      expect(nested_shadow_root).to have_css('#nested_shadow_content', text: 'nested text')
+    end
+
+    it 'should click on elements' do
+      @session.visit('/with_shadow')
+      shadow_root = @session.find(:css, '#shadow_host').shadow_root
+      checkbox = shadow_root.find(:css, 'input[type="checkbox"]')
+      expect(checkbox).not_to be_checked
+      checkbox.click
+      expect(checkbox).to be_checked
+    end
+
+    it 'should use convenience methods once moved to a descendant of the shadow root' do
+      @session.visit('/with_shadow')
+      shadow_root = @session.find(:css, '#shadow_host').shadow_root
+      descendant = shadow_root.find(:css, '#controls_wrapper')
+      expect do
+        descendant.check('shadow_checkbox')
+      end.not_to raise_error
+      expect(descendant).to have_checked_field('shadow_checkbox')
+    end
+
+    it 'should produce error messages when failing' do
+      @session.visit('/with_shadow')
+      shadow_root = @session.find(:css, '#shadow_host').shadow_root
+      expect do
+        expect(shadow_root).to have_css('#shadow_content', text: 'Not in the document')
+      end.to raise_error(/tag="ShadowRoot"/)
+    end
+
+    it 'should get visible text' do
+      @session.visit('/with_shadow')
+      shadow_root = @session.find(:css, '#shadow_host').shadow_root
+      expect(shadow_root).to have_text('some text scroll.html')
+    end
+
+    it 'should get all text' do
+      @session.visit('/with_shadow')
+      shadow_root = @session.find(:css, '#shadow_host').shadow_root
+      expect(shadow_root).to have_text(:all, 'some text scroll.html')
     end
   end
 

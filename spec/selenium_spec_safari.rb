@@ -8,27 +8,40 @@ require 'rspec/shared_spec_matchers'
 
 SAFARI_DRIVER = :selenium_safari
 
-if ::Selenium::WebDriver::Service.respond_to? :driver_path=
-  ::Selenium::WebDriver::Safari::Service
-else
-  ::Selenium::WebDriver::Safari
-end.driver_path = '/Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver'
+# if ::Selenium::WebDriver::Service.respond_to? :driver_path=
+#   ::Selenium::WebDriver::Safari::Service
+# else
+#   ::Selenium::WebDriver::Safari
+# end.driver_path = '/Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver'
 
-browser_options = ::Selenium::WebDriver::Safari::Options.new
+browser_options = Selenium::WebDriver::Safari::Options.new
 # browser_options.headless! if ENV['HEADLESS']
 
 Capybara.register_driver :selenium_safari do |app|
-  Capybara::Selenium::Driver.new(app, browser: :safari, options: browser_options, timeout: 30).tap do |driver|
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
+  driver_options = { browser: :safari, timeout: 30 }.tap do |opts|
+    opts[options_key] = browser_options
+  end
+
+  Capybara::Selenium::Driver.new(app, **driver_options).tap do |driver|
     # driver.browser.download_path = Capybara.save_path
   end
 end
 
 Capybara.register_driver :selenium_safari_not_clear_storage do |app|
-  safari_options = {
+  version = Capybara::Selenium::Driver.load_selenium
+  options_key = Capybara::Selenium::Driver::CAPS_VERSION.satisfied_by?(version) ? :capabilities : :options
+  driver_options = {
     browser: :safari,
-    options: browser_options
-  }
-  Capybara::Selenium::Driver.new(app, safari_options.merge(clear_local_storage: false, clear_session_storage: false))
+    clear_local_storage: false,
+    clear_session_storage: false,
+    timeout: 30
+  }.tap do |opts|
+    opts[options_key] = browser_options
+  end
+
+  Capybara::Selenium::Driver.new(app, **driver_options)
 end
 
 module TestSessions
@@ -64,16 +77,19 @@ Capybara::SpecHelper.run_specs TestSessions::Safari, SAFARI_DRIVER.to_s, capybar
   when 'Capybara::Session selenium_safari node #double_click should allow to adjust the offset',
        'Capybara::Session selenium_safari node #double_click should double click an element'
     pending "safardriver doesn't generate a double click event"
-  when 'Capybara::Session selenium_safari node #click should allow multiple modifiers',
-       /Capybara::Session selenium_safari node #(click|right_click|double_click) should allow modifiers/
-    pending "safaridriver doesn't take key state into account when clicking"
-  when 'Capybara::Session selenium_safari #fill_in on a pre-populated textfield with a reformatting onchange should trigger change when clearing field'
-    pending "safardriver clear doesn't generate change event"
+  when 'Capybara::Session selenium_safari node #double_click should allow modifiers'
+    pending "safaridriver doesn't generate double click with key modifiers"
+  when /when w3c_click_offset is true should offset/
+    pending 'w3c_click_offset is not currently supported with safaridriver'
   when 'Capybara::Session selenium_safari #go_back should fetch a response from the driver from the previous page',
        'Capybara::Session selenium_safari #go_forward should fetch a response from the driver from the previous page'
     skip 'safaridriver loses the ability to find elements in the document after `go_back`'
-  when /drag_to.*HTML5/
-    pending "Safari doesn't support"
+  when 'Capybara::Session selenium node #shadow_root should get the shadow root',
+    'Capybara::Session selenium node #shadow_root should find elements inside the shadow dom using CSS',
+    'Capybara::Session selenium node #shadow_root should find nested shadow roots'
+    pending "Safari doesn't yet have W3C shadow root support"
+  when /Capybara::Session selenium_chrome node #shadow_root should get visible text/
+    pending "Selenium doesn't currently support getting visible text for shadow root elements"
   end
 end
 
@@ -123,7 +139,6 @@ RSpec.describe 'Capybara::Session with safari' do
     end
 
     it 'should fill in a date input with a String' do
-      pending "Safari doesn't support date inputs"
       session.fill_in('form_date', with: '06/19/1983')
       session.click_button('awesome')
       expect(Date.parse(extract_results(session)['date'])).to eq datetime.to_date

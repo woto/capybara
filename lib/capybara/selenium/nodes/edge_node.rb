@@ -24,12 +24,6 @@ class Capybara::Selenium::EdgeNode < Capybara::Selenium::Node
       JS
     end
     super
-  rescue *file_errors => e
-    if e.message.match?(/File not found : .+\n.+/m)
-      raise ArgumentError, "Selenium < 3.14 with remote Chrome doesn't support multiple file upload"
-    end
-
-    raise
   end
 
   def drop(*args)
@@ -38,7 +32,7 @@ class Capybara::Selenium::EdgeNode < Capybara::Selenium::Node
     html5_drop(*args)
   end
 
-  def click(*)
+  def click(*, **)
     super
   rescue Selenium::WebDriver::Error::InvalidArgumentError => e
     tag_name, type = attrs(:tagName, :type).map { |val| val&.downcase }
@@ -69,7 +63,7 @@ class Capybara::Selenium::EdgeNode < Capybara::Selenium::Node
     return super unless chrome_edge? && native_displayed?
 
     begin
-      bridge.send(:execute, :is_element_displayed, id: native.ref)
+      bridge.send(:execute, :is_element_displayed, id: native_id)
     rescue Selenium::WebDriver::Error::UnknownCommandError
       # If the is_element_displayed command is unknown, no point in trying again
       driver.options[:native_displayed] = false
@@ -77,13 +71,25 @@ class Capybara::Selenium::EdgeNode < Capybara::Selenium::Node
     end
   end
 
-private
-
-  def file_errors
-    @file_errors = ::Selenium::WebDriver.logger.suppress_deprecations do
-      [::Selenium::WebDriver::Error::ExpectedError]
+  def send_keys(*args)
+    args.chunk { |inp| inp.is_a?(String) && inp.match?(/\p{Emoji Presentation}/) }
+        .each do |contains_emoji, inputs|
+      if contains_emoji
+        inputs.join.grapheme_clusters.chunk { |gc| gc.match?(/\p{Emoji Presentation}/) }
+              .each do |emoji, clusters|
+          if emoji
+            driver.send(:execute_cdp, 'Input.insertText', text: clusters.join)
+          else
+            super(clusters.join)
+          end
+        end
+      else
+        super(*inputs)
+      end
     end
   end
+
+private
 
   def browser_version
     @browser_version ||= begin

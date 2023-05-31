@@ -1,7 +1,6 @@
 # Capybara
 
-[![Build Status](https://secure.travis-ci.org/teamcapybara/capybara.svg)](https://travis-ci.org/teamcapybara/capybara)
-[![Build Status](https://ci.appveyor.com/api/projects/status/github/teamcapybara/capybara?svg=true)](https://ci.appveyor.com/api/projects/github/teamcapybara/capybara)
+[![Build Status](https://github.com/teamcapybara/capybara/actions/workflows/build.yml/badge.svg)](https://github.com/teamcapybara/capybara/actions/workflows/build.yml)
 [![Code Climate](https://codeclimate.com/github/teamcapybara/capybara.svg)](https://codeclimate.com/github/teamcapybara/capybara)
 [![Coverage Status](https://coveralls.io/repos/github/teamcapybara/capybara/badge.svg?branch=master)](https://coveralls.io/github/teamcapybara/capybara?branch=master)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/jnicklas/capybara?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
@@ -74,7 +73,7 @@ GitHub): http://groups.google.com/group/ruby-capybara
 
 ## <a name="setup"></a>Setup
 
-Capybara requires Ruby 2.6.0 or later. To install, add this line to your
+Capybara requires Ruby 3.0.0 or later. To install, add this line to your
 `Gemfile` and run `bundle install`:
 
 ```ruby
@@ -151,6 +150,8 @@ RSpec](https://relishapp.com/rspec/rspec-rails/v/4-0/docs/directory-structure))
 and if you have your Capybara specs in a different directory, then tag the
 example groups with `type: :feature` or `type: :system` depending on which type of test you're writing.
 
+If you are using Rails system specs please see [their documentation](https://relishapp.com/rspec/rspec-rails/docs/system-specs/system-spec#system-specs-driven-by-selenium-chrome-headless) for selecting the driver you wish to use.
+
 If you are not using Rails, tag all the example groups in which you want to use
 Capybara with `type: :feature`.
 
@@ -159,7 +160,7 @@ You can now write your specs like so:
 ```ruby
 describe "the signin process", type: :feature do
   before :each do
-    User.make(email: 'user@example.com', password: 'password')
+    User.create(email: 'user@example.com', password: 'password')
   end
 
   it "signs me in" do
@@ -190,7 +191,7 @@ Capybara also comes with a built in DSL for creating descriptive acceptance test
 ```ruby
 feature "Signing in" do
   background do
-    User.make(email: 'user@example.com', password: 'caplin')
+    User.create(email: 'user@example.com', password: 'caplin')
   end
 
   scenario "Signing in with correct credentials" do
@@ -203,7 +204,7 @@ feature "Signing in" do
     expect(page).to have_content 'Success'
   end
 
-  given(:other_user) { User.make(email: 'other@example.com', password: 'rous') }
+  given(:other_user) { User.create(email: 'other@example.com', password: 'rous') }
 
   scenario "Signing in as another user" do
     visit '/sessions/new'
@@ -257,6 +258,8 @@ end
     ```
 
 ## <a name="using-capybara-with-minitest"></a>Using Capybara with Minitest
+
+* If you are using Rails system tests please see their documentation for information on selecting the driver you wish to use.
 
 * If you are using Rails, but not using Rails system tests, add the following code in your `test_helper.rb`
     file to make Capybara available in all test cases deriving from
@@ -332,7 +335,7 @@ By default, Capybara uses the `:rack_test` driver, which is fast but limited: it
 does not support JavaScript, nor is it able to access HTTP resources outside of
 your Rack application, such as remote APIs and OAuth services. To get around
 these limitations, you can set up a different default driver for your features.
-For example if you'd prefer to run everything in Selenium, you could do:
+For example, if you'd prefer to run everything in Selenium, you could do:
 
 ```ruby
 Capybara.default_driver = :selenium # :selenium_chrome and :selenium_chrome_headless are also registered
@@ -626,7 +629,7 @@ JS
 
 ### <a name="modals"></a>Modals
 
-In drivers which support it, you can accept, dismiss and respond to alerts, confirms and prompts.
+In drivers which support it, you can accept, dismiss and respond to alerts, confirms, and prompts.
 
 You can accept or dismiss alert messages by wrapping the code that produces an alert in a block:
 
@@ -777,7 +780,7 @@ expect(page).to have_content('baz')
 If clicking on the *foo* link triggers an asynchronous process, such as
 an Ajax request, which, when complete will add the *bar* link to the page,
 clicking on the *bar* link would be expected to fail, since that link doesn't
-exist yet. However Capybara is smart enough to retry finding the link for a
+exist yet. However, Capybara is smart enough to retry finding the link for a
 brief period of time before giving up and throwing an error. The same is true of
 the next line, which looks for the content *baz* on the page; it will retry
 looking for that content for a brief time. You can adjust how long this period
@@ -791,13 +794,25 @@ Be aware that because of this behaviour, the following two statements are **not*
 equivalent, and you should **always** use the latter!
 
 ```ruby
-!page.has_xpath?('a')
-page.has_no_xpath?('a')
+# Given use of a driver where the page is loaded when visit returns
+# and that Capybara.predicates_wait is `true`
+# consider a page where the `a` tag is removed through AJAX after 1s
+visit(some_path)
+!page.has_xpath?('a')  # is false
+page.has_no_xpath?('a')  # is true
 ```
 
-The former would immediately fail because the content has not yet been removed.
-Only the latter would wait for the asynchronous process to remove the content
-from the page.
+First expression:
+- `has_xpath?('a')` is called right after `visit` returns. It is `true` because the link has not yet been removed
+- Capybara does not wait upon successful predicates/assertions, therefore **has_xpath? returns `true` immediately**
+- The expression returns `false` (because it is negated with the leading `!`)
+
+Second expression:
+- `has_no_xpath?('a')` is called right after `visit` returns. It is `false` because the link has not yet been removed.
+- Capybara waits upon failed predicates/assertions, therefore **has_no_xpath? does not return `false` immediately**
+- Capybara will periodically re-check the predicate/assertion up to the `default_max_wait_time` defined
+- after 1s, the predicate becomes `true` (because the link has been removed)
+- The expression returns `true`
 
 Capybara's RSpec matchers, however, are smart enough to handle either form.
 The two following statements are functionally equivalent:

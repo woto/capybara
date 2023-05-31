@@ -39,7 +39,7 @@ module Capybara
     #   See {Capybara.configure}
     # @!method javascript_driver
     #   See {Capybara.configure}
-    # @!method allow_gumbo
+    # @!method use_html5_parsing
     #   See {Capybara.configure}
     Config::OPTIONS.each do |method|
       def_delegators :config, method, "#{method}="
@@ -69,7 +69,7 @@ module Capybara
     #
     # #### Configurable options
     #
-    # - **allow_gumbo** (Boolean = `false`) - When `nokogumbo` is available, whether it will be used to parse HTML strings.
+    # - **use_html5_parsing** (Boolean = `false`) - When Nokogiri >= 1.12.0 or `nokogumbo` is installed, whether HTML5 parsing will be used for HTML strings.
     # - **always_include_port** (Boolean = `false`) - Whether the Rack server's port should automatically be inserted into every visited URL
     #   unless another port is explicitly specified.
     # - **app_host** (String, `nil`) - The default host to use when giving a relative URL to visit, must be a valid URL e.g. `http://www.example.com`.
@@ -79,6 +79,7 @@ module Capybara
     # - **automatic_reload** (Boolean = `true`) - Whether to automatically reload elements as Capybara is waiting.
     # - **default_max_wait_time** (Numeric = `2`) - The maximum number of seconds to wait for asynchronous processes to finish.
     # - **default_normalize_ws** (Boolean = `false`) - Whether text predicates and matchers use normalize whitespace behavior.
+    # - **default_retry_interval** (Numeric = `0.01`) - The number of seconds to delay the next check in asynchronous processes.
     # - **default_selector** (`:css`, `:xpath` = `:css`) - Methods which take a selector use the given type by default. See also {Capybara::Selector}.
     # - **default_set_options** (Hash = `{}`) - The default options passed to {Capybara::Node::Element#set Element#set}.
     # - **enable_aria_label** (Boolean = `false`) - Whether fields, links, and buttons will match against `aria-label` attribute.
@@ -96,11 +97,12 @@ module Capybara
     #   {Capybara::Session#save_and_open_page save_and_open_page}, or {Capybara::Session#save_and_open_screenshot save_and_open_screenshot}.
     # - **server** (Symbol = `:default` (which uses puma)) - The name of the registered server to use when running the app under test.
     # - **server_port** (Integer) - The port Capybara will run the application server on, if not specified a random port will be used.
+    # - **server_host** (String = "127.0.0.1") - The IP address Capybara will bind the application server to. If the test application is to be accessed from an external host, you will want to change this to "0.0.0.0" or to a more specific IP address that your test client can reach.
     # - **server_errors** (Array\<Class> = `[Exception]`) - Error classes that should be raised in the tests if they are raised in the server
     #   and {configure raise_server_errors} is `true`.
     # - **test_id** (Symbol, String, `nil` = `nil`) - Optional attribute to match locator against with built-in selectors along with id.
     # - **threadsafe** (Boolean = `false`) - Whether sessions can be configured individually.
-    # - **w3c_click_offset** (Boolean = 'false') - Whether click offsets should be from element center (true) or top left (false)
+    # - **w3c_click_offset** (Boolean = 'true') - Whether click offsets should be from element center (true) or top left (false)
     #
     # #### DSL Options
     #
@@ -385,26 +387,21 @@ module Capybara
     # @return [Nokogiri::HTML::Document]      HTML document
     #
     def HTML(html) # rubocop:disable Naming/MethodName
-      if Nokogiri.respond_to?(:HTML5) && Capybara.allow_gumbo # Nokogumbo installed and allowed for use
-        Nokogiri::HTML5(html).tap do |document|
-          document.xpath('//template').each do |template|
-            # template elements content is not part of the document
-            template.inner_html = ''
-          end
-          document.xpath('//textarea').each do |textarea|
-            # The Nokogumbo HTML5 parser already returns spec compliant contents
-            textarea['_capybara_raw_value'] = textarea.content
-          end
-        end
+      # Nokogiri >= 1.12.0 or Nokogumbo installed and allowed for use
+      html_parser, using_html5 = if defined?(Nokogiri::HTML5) && Capybara.use_html5_parsing
+        [Nokogiri::HTML5, true]
       else
-        Nokogiri::HTML(html).tap do |document|
-          document.xpath('//template').each do |template|
-            # template elements content is not part of the document
-            template.inner_html = ''
-          end
-          document.xpath('//textarea').each do |textarea|
-            textarea['_capybara_raw_value'] = textarea.content.delete_prefix("\n")
-          end
+        [defined?(Nokogiri::HTML4) ? Nokogiri::HTML4 : Nokogiri::HTML, false]
+      end
+
+      html_parser.parse(html).tap do |document|
+        document.xpath('//template').each do |template|
+          # template elements content is not part of the document
+          template.inner_html = ''
+        end
+        document.xpath('//textarea').each do |textarea|
+          # The Nokogiri HTML5 parser already returns spec compliant contents
+          textarea['_capybara_raw_value'] = using_html5 ? textarea.content : textarea.content.delete_prefix("\n")
         end
       end
     end
@@ -467,6 +464,7 @@ module Capybara
   require 'capybara/queries/ancestor_query'
   require 'capybara/queries/sibling_query'
   require 'capybara/queries/style_query'
+  require 'capybara/queries/active_element_query'
 
   require 'capybara/node/finders'
   require 'capybara/node/matchers'
@@ -499,6 +497,7 @@ Capybara.configure do |config|
   config.server = :default
   config.default_selector = :css
   config.default_max_wait_time = 2
+  config.default_retry_interval = 0.01
   config.ignore_hidden_elements = true
   config.default_host = 'http://www.example.com'
   config.automatic_reload = true
@@ -516,6 +515,6 @@ Capybara.configure do |config|
   config.test_id = nil
   config.predicates_wait = true
   config.default_normalize_ws = false
-  config.allow_gumbo = false
-  config.w3c_click_offset = false
+  config.use_html5_parsing = false
+  config.w3c_click_offset = true
 end

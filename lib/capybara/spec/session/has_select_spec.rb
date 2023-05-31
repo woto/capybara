@@ -179,10 +179,16 @@ Capybara::SpecHelper.spec '#has_select?' do
     end
   end
 
+  it 'should raise an error if an invalid option is passed' do
+    expect do
+      expect(@session).to have_select('form_languages', invalid: true)
+    end.to raise_error(ArgumentError, 'Invalid option(s) :invalid, should be one of :above, :below, :left_of, :right_of, :near, :count, :minimum, :maximum, :between, :text, :id, :class, :style, :visible, :obscured, :exact, :exact_text, :normalize_ws, :match, :wait, :filter_set, :focused, :disabled, :name, :placeholder, :options, :enabled_options, :disabled_options, :selected, :with_selected, :multiple, :with_options')
+  end
+
   it 'should support locator-less usage' do
-    expect(@session.has_select?(with_options: %w[Norway Sweden])).to eq true
+    expect(@session.has_select?(with_options: %w[Norway Sweden])).to be true
     expect(@session).to have_select(with_options: ['London'])
-    expect(@session.has_select?(with_selected: %w[Commando Boxerbriefs])).to eq true
+    expect(@session.has_select?(with_selected: %w[Commando Boxerbriefs])).to be true
     expect(@session).to have_select(with_selected: ['Briefs'])
   end
 end
@@ -302,9 +308,9 @@ Capybara::SpecHelper.spec '#has_no_select?' do
   end
 
   it 'should support locator-less usage' do
-    expect(@session.has_no_select?(with_options: %w[Norway Sweden Finland Latvia])).to eq true
+    expect(@session.has_no_select?(with_options: %w[Norway Sweden Finland Latvia])).to be true
     expect(@session).to have_no_select(with_options: ['New London'])
-    expect(@session.has_no_select?(id: 'form_underwear', with_selected: ['Boxers'])).to eq true
+    expect(@session.has_no_select?(id: 'form_underwear', with_selected: ['Boxers'])).to be true
     expect(@session).to have_no_select(id: 'form_underwear', with_selected: %w[Commando Boxers])
   end
 end

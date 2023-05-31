@@ -18,7 +18,7 @@ module Capybara
       #
       # @!macro system_filters
       #   @option options [String, Regexp] text      Only find elements which contain this text or match this regexp
-      #   @option options [String, Boolean] exact_text
+      #   @option options [String, Regexp, String] exact_text
       #     When String the elements contained text must match exactly, when Boolean controls whether the `text` option must match exactly.
       #     Defaults to {Capybara.configure exact_text}.
       #   @option options [Boolean] normalize_ws
@@ -50,6 +50,13 @@ module Capybara
       #
       def find(*args, **options, &optional_filter_block)
         options[:session_options] = session_options
+        count_options = options.slice(*Capybara::Queries::BaseQuery::COUNT_KEYS)
+        unless count_options.empty?
+          Capybara::Helpers.warn(
+            "'find' does not support count options (#{count_options}) ignoring. " \
+            "Called from: #{Capybara::Helpers.filter_backtrace(caller)}"
+          )
+        end
         synced_resolve Capybara::Queries::SelectorQuery.new(*args, **options, &optional_filter_block)
       end
 
@@ -142,6 +149,8 @@ module Capybara
       #   @option options [String, Regexp] id         Match links with the id provided
       #   @option options [String] title              Match links with the title provided
       #   @option options [String] alt                Match links with a contained img element whose alt matches
+      #   @option options [String, Boolean] download  Match links with the download provided
+      #   @option options [String] target             Match links with the target provided
       #   @option options [String, Array<String>, Regexp] class    Match links that match the class(es) provided
       # @return [Capybara::Node::Element]   The found element
       #

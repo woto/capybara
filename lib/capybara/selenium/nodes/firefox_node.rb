@@ -11,8 +11,8 @@ class Capybara::Selenium::FirefoxNode < Capybara::Selenium::Node
     super
   rescue ::Selenium::WebDriver::Error::ElementNotInteractableError
     if tag_name == 'tr'
-      warn 'You are attempting to click a table row which has issues in geckodriver/marionette - '\
-           'see https://github.com/mozilla/geckodriver/issues/1228. Your test should probably be '\
+      warn 'You are attempting to click a table row which has issues in geckodriver/marionette - ' \
+           'see https://github.com/mozilla/geckodriver/issues/1228 - Your test should probably be ' \
            'clicking on a table cell like a user would. Clicking the first cell in the row instead.'
       return find_css('th:first-child,td:first-child')[0].click(keys, **options)
     end
@@ -76,7 +76,7 @@ class Capybara::Selenium::FirefoxNode < Capybara::Selenium::Node
     return super unless native_displayed?
 
     begin
-      bridge.send(:execute, :is_element_displayed, id: native.ref)
+      bridge.send(:execute, :is_element_displayed, id: native_id)
     rescue Selenium::WebDriver::Error::UnknownCommandError
       # If the is_element_displayed command is unknown, no point in trying again
       driver.options[:native_displayed] = false

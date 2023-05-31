@@ -16,13 +16,10 @@ module Capybara
       @registered[name] = value
     end
 
-    def method_missing(method_name, *args, **options, &block)
+    def method_missing(method_name, ...)
       if @registered.respond_to?(method_name)
         Capybara::Helpers.warn "DEPRECATED: Calling '#{method_name}' on the drivers/servers container is deprecated without replacement"
-        # RUBY 2.6 will send an empty hash rather than nothing with **options so fix that
-        return @registered.public_send(method_name, *args, &block) if options.empty?
-
-        return @registered.public_send(method_name, *args, **options, &block)
+        return @registered.public_send(method_name, ...)
       end
       super
     end

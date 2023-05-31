@@ -120,7 +120,7 @@ RSpec.shared_examples Capybara::RSpecMatchers do |session, _mode|
 
   describe 'have_xpath matcher' do
     it 'gives proper description' do
-      expect(have_xpath('//h1').description).to eq("have visible xpath \"\/\/h1\"")
+      expect(have_xpath('//h1').description).to eq('have visible xpath "//h1"')
     end
 
     context 'on a string' do
@@ -840,10 +840,10 @@ RSpec.shared_examples Capybara::RSpecMatchers do |session, _mode|
     end
 
     it 'gives proper description when :visible option passed' do
-      expect(have_table('Lovely table', visible: true).description).to eq('have visible table "Lovely table"') # rubocop:disable RSpec/Capybara/VisibilityMatcher
+      expect(have_table('Lovely table', visible: true).description).to eq('have visible table "Lovely table"') # rubocop:disable Capybara/VisibilityMatcher
       expect(have_table('Lovely table', visible: :hidden).description).to eq('have non-visible table "Lovely table"')
       expect(have_table('Lovely table', visible: :all).description).to eq('have table "Lovely table"')
-      expect(have_table('Lovely table', visible: false).description).to eq('have table "Lovely table"') # rubocop:disable RSpec/Capybara/VisibilityMatcher
+      expect(have_table('Lovely table', visible: false).description).to eq('have table "Lovely table"') # rubocop:disable Capybara/VisibilityMatcher
     end
 
     it 'passes if there is such a table' do

@@ -40,6 +40,7 @@ module Capybara
 
     NODE_METHODS = %i[
       all first attach_file text check choose scroll_to scroll_by
+      click double_click right_click
       click_link_or_button click_button click_link
       fill_in find find_all find_button find_by_id find_field find_link
       has_content? has_text? has_css? has_no_content? has_no_text?
@@ -58,7 +59,7 @@ module Capybara
     ].freeze
     SESSION_METHODS = %i[
       body html source current_url current_host current_path
-      execute_script evaluate_script visit refresh go_back go_forward send_keys
+      execute_script evaluate_script evaluate_async_script visit refresh go_back go_forward send_keys
       within within_element within_fieldset within_table within_frame switch_to_frame
       current_window windows open_new_window switch_to_window within_window window_opened_by
       save_page save_and_open_page save_screenshot
@@ -129,6 +130,8 @@ module Capybara
       if @touched
         driver.reset!
         @touched = false
+        switch_to_frame(:top) rescue nil # rubocop:disable Style/RescueModifier
+        @scopes = [nil]
       end
       @server&.wait_for_pending_requests
       raise_server_error!
@@ -159,9 +162,8 @@ module Capybara
         if config.raise_server_errors
           raise CapybaraError, 'Your application server raised an error - It has been raised in your test code because Capybara.raise_server_errors == true'
         end
-      rescue CapybaraError
-        # needed to get the cause set correctly in JRuby -- otherwise we could just do raise @server.error
-        raise @server.error, @server.error.message, @server.error.backtrace
+      rescue CapybaraError => capy_error # rubocop:disable Naming/RescuedExceptionsVariableName
+        raise @server.error, cause: capy_error
       ensure
         @server.reset_error!
       end
@@ -307,8 +309,18 @@ module Capybara
     # @!method send_keys
     #   @see Capybara::Node::Element#send_keys
     #
-    def send_keys(*args, **kw_args)
-      driver.send_keys(*args, **kw_args)
+    def send_keys(...)
+      driver.send_keys(...)
+    end
+
+    ##
+    #
+    # Returns the element with focus.
+    #
+    # Not supported by Rack Test
+    #
+    def active_element
+      Capybara::Queries::ActiveElementQuery.new.resolve_for(self)[0].tap(&:allow_reload!)
     end
 
     ##
@@ -350,7 +362,7 @@ module Capybara
       new_scope = args.first.respond_to?(:to_capybara_node) ? args.first.to_capybara_node : find(*args, **kw_args)
       begin
         scopes.push(new_scope)
-        yield if block_given?
+        yield new_scope if block_given?
       ensure
         scopes.pop
       end
@@ -399,7 +411,7 @@ module Capybara
         scopes.push(:frame)
       when :parent
         if scopes.last != :frame
-          raise Capybara::ScopeError, "`switch_to_frame(:parent)` cannot be called from inside a descendant frame's "\
+          raise Capybara::ScopeError, "`switch_to_frame(:parent)` cannot be called from inside a descendant frame's " \
                                       '`within` block.'
         end
         scopes.pop
@@ -409,7 +421,7 @@ module Capybara
         top_level_scopes = [:frame, nil]
         if idx
           if scopes.slice(idx..).any? { |scope| !top_level_scopes.include?(scope) }
-            raise Capybara::ScopeError, "`switch_to_frame(:top)` cannot be called from inside a descendant frame's "\
+            raise Capybara::ScopeError, "`switch_to_frame(:top)` cannot be called from inside a descendant frame's " \
                                         '`within` block.'
           end
           scopes.slice!(idx..)
@@ -501,7 +513,7 @@ module Capybara
       raise ArgumentError, '`switch_to_window`: either window or block should be provided' if !window && !window_locator
 
       unless scopes.last.nil?
-        raise Capybara::ScopeError, '`switch_to_window` is not supposed to be invoked from '\
+        raise Capybara::ScopeError, '`switch_to_window` is not supposed to be invoked from ' \
                                     '`within` or `within_frame` blocks.'
       end
 
@@ -572,7 +584,7 @@ module Capybara
       synchronize_windows(options) do
         opened_handles = (driver.window_handles - old_handles)
         if opened_handles.size != 1
-          raise Capybara::WindowError, 'block passed to #window_opened_by '\
+          raise Capybara::WindowError, 'block passed to #window_opened_by ' \
                                        "opened #{opened_handles.size} windows instead of 1"
         end
         Window.new(self, opened_handles.first)
@@ -755,33 +767,20 @@ module Capybara
     end
 
     NODE_METHODS.each do |method|
-      if RUBY_VERSION >= '2.7'
-        class_eval <<~METHOD, __FILE__, __LINE__ + 1
-          def #{method}(...)
-            @touched = true
-            current_scope.#{method}(...)
-          end
-        METHOD
-      else
-        define_method method do |*args, &block|
+      class_eval <<~METHOD, __FILE__, __LINE__ + 1
+        def #{method}(...)
           @touched = true
-          current_scope.send(method, *args, &block)
+          current_scope.#{method}(...)
         end
-      end
+      METHOD
     end
 
     DOCUMENT_METHODS.each do |method|
-      if RUBY_VERSION >= '2.7'
-        class_eval <<~METHOD, __FILE__, __LINE__ + 1
-          def #{method}(...)
-            document.#{method}(...)
-          end
-        METHOD
-      else
-        define_method method do |*args, &block|
-          document.send(method, *args, &block)
+      class_eval <<~METHOD, __FILE__, __LINE__ + 1
+        def #{method}(...)
+          document.#{method}(...)
         end
-      end
+      METHOD
     end
 
     def inspect

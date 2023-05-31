@@ -1,25 +1,19 @@
 # frozen_string_literal: true
 
 require 'capybara/rack_test/errors'
+require 'capybara/node/whitespace_normalizer'
 
 class Capybara::RackTest::Node < Capybara::Driver::Node
+  include Capybara::Node::WhitespaceNormalizer
+
   BLOCK_ELEMENTS = %w[p h1 h2 h3 h4 h5 h6 ol ul pre address blockquote dl div fieldset form hr noscript table].freeze
 
   def all_text
-    native.text
-          .gsub(/[\u200b\u200e\u200f]/, '')
-          .gsub(/[\ \n\f\t\v\u2028\u2029]+/, ' ')
-          .gsub(/\A[[:space:]&&[^\u00a0]]+/, '')
-          .gsub(/[[:space:]&&[^\u00a0]]+\z/, '')
-          .tr("\u00a0", ' ')
+    normalize_spacing(native.text)
   end
 
   def visible_text
-    displayed_text.squeeze(' ')
-                  .gsub(/[\ \n]*\n[\ \n]*/, "\n")
-                  .gsub(/\A[[:space:]&&[^\u00a0]]+/, '')
-                  .gsub(/[[:space:]&&[^\u00a0]]+\z/, '')
-                  .tr("\u00a0", ' ')
+    normalize_visible_spacing(displayed_text)
   end
 
   def [](name)
@@ -131,19 +125,12 @@ class Capybara::RackTest::Node < Capybara::Driver::Node
     alias_method "unchecked_#{meth_name}", meth_name
     private "unchecked_#{meth_name}" # rubocop:disable Style/AccessModifierDeclarations
 
-    if RUBY_VERSION >= '2.7'
-      class_eval <<~METHOD, __FILE__, __LINE__ + 1
-        def #{meth_name}(...)
-          stale_check
-          method(:"unchecked_#{meth_name}").call(...)
-        end
-      METHOD
-    else
-      define_method meth_name do |*args|
+    class_eval <<~METHOD, __FILE__, __LINE__ + 1
+      def #{meth_name}(...)
         stale_check
-        send("unchecked_#{meth_name}", *args)
+        method(:"unchecked_#{meth_name}").call(...)
       end
-    end
+    METHOD
   end
 
 protected
@@ -153,9 +140,11 @@ protected
     if !string_node.visible?(check_ancestor)
       ''
     elsif native.text?
-      native.text
-            .gsub(/[\u200b\u200e\u200f]/, '')
-            .gsub(/[\ \n\f\t\v\u2028\u2029]+/, ' ')
+      native
+        .text
+        .delete(REMOVED_CHARACTERS)
+        .tr(SQUEEZED_SPACES, ' ')
+        .squeeze(' ')
     elsif native.element?
       text = native.children.map do |child|
         Capybara::RackTest::Node.new(driver, child).displayed_text(check_ancestor: false)
@@ -216,7 +205,7 @@ private
     min, max, step = (native['min'] || 0).to_f, (native['max'] || 100).to_f, (native['step'] || 1).to_f
     value = value.to_f
     value = value.clamp(min, max)
-    value = ((value - min) / step).round * step + min
+    value = (((value - min) / step).round * step) + min
     native['value'] = value.clamp(min, max)
   end
 
@@ -235,7 +224,14 @@ private
       end
       native.remove
     else
-      native['value'] = value.to_s
+      value.to_s.tap do |set_value|
+        if set_value.end_with?("\n") && form&.css('input, textarea')&.count
+          native['value'] = set_value.to_s.chop
+          Capybara::RackTest::Form.new(driver, form).submit(self)
+        else
+          native['value'] = set_value
+        end
+      end
     end
   end
 
@@ -244,7 +240,7 @@ private
   end
 
   def follow_link
-    method = self['data-method'] if driver.options[:respect_data_method]
+    method = self['data-method'] || self['data-turbo-method'] if driver.options[:respect_data_method]
     method ||= :get
     driver.follow(method, self[:href].to_s)
   end

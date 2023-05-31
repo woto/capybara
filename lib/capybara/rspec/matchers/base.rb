@@ -47,14 +47,16 @@ module Capybara
       end
 
       class WrappedElementMatcher < Base
-        def matches?(actual)
+        def matches?(actual, &filter_block)
+          @filter_block ||= filter_block
           element_matches?(wrap(actual))
         rescue Capybara::ExpectationNotMet => e
           @failure_message = e.message
           false
         end
 
-        def does_not_match?(actual)
+        def does_not_match?(actual, &filter_block)
+          @filter_block ||= filter_block
           element_does_not_match?(wrap(actual))
         rescue Capybara::ExpectationNotMet => e
           @failure_message_when_negated = e.message
@@ -86,12 +88,12 @@ module Capybara
           @matcher = matcher
         end
 
-        def matches?(actual)
-          @matcher.does_not_match?(actual)
+        def matches?(actual, &filter_block)
+          @matcher.does_not_match?(actual, &filter_block)
         end
 
-        def does_not_match?(actual)
-          @matcher.matches?(actual)
+        def does_not_match?(actual, &filter_block)
+          @matcher.matches?(actual, &filter_block)
         end
 
         def description

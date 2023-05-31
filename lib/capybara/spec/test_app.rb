@@ -177,10 +177,79 @@ class TestApp < Sinatra::Base
     HTML
   end
 
+  get '/with_iframe' do
+    <<-HTML
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
+          <title>Test with Iframe</title>
+        </head>
+
+        <body>
+          <iframe src="#{params[:url]}" id="#{params[:id]}"></iframe>
+        </body>
+      </html>
+    HTML
+  end
+
+  get '/base/with_base' do
+    <<-HTML
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <base href="/">
+          <title>Origin</title>
+        </head>
+        <body>
+          <a href="with_title">Title page</a>
+          <a href="?a=3">Bare query</a>
+        </body>
+      </html>
+    HTML
+  end
+
+  get '/base/with_other_base' do
+    <<-HTML
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <base href="/base/">
+          <title>Origin</title>
+        </head>
+        <body>
+          <a href="with_title">Title page</a>
+          <a href="?a=3">Bare query</a>
+        </body>
+      </html>
+    HTML
+  end
+
+  get '/csp' do
+    response.headers['Content-Security-Policy'] = "default-src 'none'; connect-src 'self'; base-uri 'none'; font-src 'self'; img-src 'self' data:; object-src 'none'; script-src 'self' 'nonce-jAviMuMisoTisVXjgLoWdA=='; style-src 'self' 'nonce-jAviMuMisoTisVXjgLoWdA=='; form-action 'self';"
+    <<-HTML
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
+          <title>CSP</title>
+        </head>
+
+        <body>
+          <div>CSP</div>
+        </body>
+      </html>
+    HTML
+  end
+
   get '/download.csv' do
     content_type 'text/csv'
     'This, is, comma, separated' \
       'Thomas, Walpole, was , here'
+  end
+
+  get %r{/apple-touch-.*\.png/} do
+    halt(404)
   end
 
   get '/:view' do |view|
@@ -191,12 +260,15 @@ class TestApp < Sinatra::Base
 
   post '/form' do
     self.class.form_post_count += 1
-    %(<pre id="results">#{params[:form].merge('post_count' => self.class.form_post_count).to_yaml}</pre>)
+    %(
+      <pre id="content_type">#{request.content_type}</pre>
+      <pre id="results">#{params.fetch(:form, {}).merge('post_count' => self.class.form_post_count).to_yaml}</pre>
+    )
   end
 
   post '/upload_empty' do
     if params[:form][:file].nil?
-      'Successfully ignored empty file field.'
+      "Successfully ignored empty file field. Content type was #{request.content_type}"
     else
       'Something went wrong.'
     end
@@ -221,10 +293,6 @@ class TestApp < Sinatra::Base
     buffer.join(' | ')
   rescue StandardError
     'No files uploaded'
-  end
-
-  get '/apple-touch-icon-precomposed.png' do
-    halt(404)
   end
 
   class << self

@@ -111,13 +111,13 @@ RSpec.describe Capybara do
     end
 
     describe 'adding a selector' do
-      it 'can set default visiblity' do
+      it 'can set default visibility' do
         described_class.add_selector :hidden_field do
           visible :hidden
           css { |_sel| 'input[type="hidden"]' }
         end
 
-        expect(string).to have_no_css('input[type="hidden"]')
+        expect(string).to have_no_css('input[type="hidden"]') # rubocop:disable Capybara/SpecificMatcher
         expect(string).to have_selector(:hidden_field)
       end
     end
@@ -159,7 +159,7 @@ RSpec.describe Capybara do
       end
 
       it 'returns nil if no match' do
-        expect(Capybara::Selector.for('nothing')).to be nil
+        expect(Capybara::Selector.for('nothing')).to be_nil
       end
     end
 
@@ -471,7 +471,7 @@ RSpec.describe Capybara do
         end
 
         it 'includes wildcarded keys in description' do
-          expect { string.find(:element, 'input', not_there: 'bad', presence: true, absence: false, count: 1) }
+          expect { string.all(:element, 'input', not_there: 'bad', presence: true, absence: false, count: 1) }
             .to(raise_error do |e|
               expect(e).to be_a(Capybara::ElementNotFound)
               expect(e.message).to include 'not_there => bad'

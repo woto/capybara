@@ -9,7 +9,7 @@ module Capybara
 
       SPATIAL_KEYS = %i[above below left_of right_of near].freeze
       VALID_KEYS = SPATIAL_KEYS + COUNT_KEYS +
-                   %i[text id class style visible obscured exact exact_text normalize_ws match wait filter_set]
+                   %i[text id class style visible obscured exact exact_text normalize_ws match wait filter_set focused]
       VALID_MATCH = %i[first smart prefer_exact one].freeze
 
       def initialize(*args,
@@ -26,6 +26,12 @@ module Capybara
         @options = options.dup
         @order = order
         @filter_cache = Hash.new { |hsh, key| hsh[key] = {} }
+
+        if @options[:text].is_a?(Regexp) && [true, false].include?(@options[:exact_text])
+          Capybara::Helpers.warn(
+            "Boolean 'exact_text' option is not supported when 'text' option is a Regexp - ignoring"
+          )
+        end
 
         super(@options)
         self.session_options = session_options
@@ -73,6 +79,8 @@ module Capybara
 
         desc << " with id #{options[:id]}" if options[:id]
         desc << " with classes [#{Array(options[:class]).join(',')}]" if options[:class]
+        desc << ' that is focused' if options[:focused]
+        desc << ' that is not focused' if options[:focused] == false
 
         desc << case options[:style]
         when String
@@ -264,7 +272,7 @@ module Capybara
       end
 
       def valid_keys
-        VALID_KEYS + custom_keys
+        (VALID_KEYS + custom_keys).uniq
       end
 
       def matches_node_filters?(node, errors)
@@ -371,6 +379,10 @@ module Capybara
         options.key?(:style) && !custom_keys.include?(:style)
       end
 
+      def use_default_focused_filter?
+        options.key?(:focused) && !custom_keys.include?(:focused)
+      end
+
       def use_spatial_filter?
         options.values_at(*SPATIAL_KEYS).compact.any?
       end
@@ -435,6 +447,7 @@ module Capybara
           matches_id_filter?(node) &&
           matches_class_filter?(node) &&
           matches_style_filter?(node) &&
+          matches_focused_filter?(node) &&
           matches_text_filter?(node) &&
           matches_exact_text_filter?(node)
       end
@@ -494,6 +507,12 @@ module Capybara
         end
       end
 
+      def matches_focused_filter?(node)
+        return true unless use_default_focused_filter?
+
+        (node == node.session.active_element) == options[:focused]
+      end
+
       def need_to_process_classes?
         case options[:class]
         when Regexp then true
@@ -528,16 +547,19 @@ module Capybara
       def matches_text_filter?(node)
         value = options[:text]
         return true unless value
-        return matches_text_exactly?(node, value) if exact_text == true
+        return matches_text_exactly?(node, value) if exact_text == true && !value.is_a?(Regexp)
 
         regexp = value.is_a?(Regexp) ? value : Regexp.escape(value.to_s)
         matches_text_regexp?(node, regexp)
       end
 
       def matches_exact_text_filter?(node)
-        return true unless exact_text.is_a?(String)
-
-        matches_text_exactly?(node, exact_text)
+        case exact_text
+        when String, Regexp
+          matches_text_exactly?(node, exact_text)
+        else
+          true
+        end
       end
 
       def matches_visibility_filters?(node)
@@ -548,7 +570,9 @@ module Capybara
         when :visible
           node.initial_cache[:visible] || (node.initial_cache[:visible].nil? && node.visible?)
         when :hidden
-          (node.initial_cache[:visible] == false) || (node.initial_cache[:visbile].nil? && !node.visible?)
+          # TODO: check why the 'visbile' cache spelling mistake wasn't caught in a test
+          # (node.initial_cache[:visible] == false) || (node.initial_cache[:visbile].nil? && !node.visible?)
+          (node.initial_cache[:visible] == false) || (node.initial_cache[:visible].nil? && !node.visible?)
         else
           true
         end
@@ -565,17 +589,21 @@ module Capybara
 
       def matches_text_exactly?(node, value)
         regexp = value.is_a?(Regexp) ? value : /\A#{Regexp.escape(value.to_s)}\z/
-        matches_text_regexp?(node, regexp)
+        matches_text_regexp(node, regexp).then { |m| m&.pre_match == '' && m&.post_match == '' }
       end
 
       def normalize_ws
         options.fetch(:normalize_ws, session_options.default_normalize_ws)
       end
 
-      def matches_text_regexp?(node, regexp)
+      def matches_text_regexp(node, regexp)
         text_visible = visible
         text_visible = :all if text_visible == :hidden
-        node.text(text_visible, normalize_ws: normalize_ws).match?(regexp)
+        node.text(text_visible, normalize_ws: normalize_ws).match(regexp)
+      end
+
+      def matches_text_regexp?(node, regexp)
+        !matches_text_regexp(node, regexp).nil?
       end
 
       def default_visibility

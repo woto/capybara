@@ -21,8 +21,8 @@ def ensure_selenium_running!
   rescue StandardError
     if timer.expired?
       raise 'Selenium is not running. ' \
-            "You can run a selenium server easily with: \n" \
-            '  $ docker-compose up -d selenium_chrome'
+            "You can run a selenium server easily with: \n  " \
+            '$ docker-compose up -d selenium_chrome'
     else
       puts 'Waiting for Selenium docker instance...'
       sleep 1
@@ -39,11 +39,10 @@ Capybara.register_driver :selenium_chrome_remote do |app|
   ensure_selenium_running!
 
   url = "http://#{selenium_host}:#{selenium_port}/wd/hub"
-  browser_options = ::Selenium::WebDriver::Chrome::Options.new
+  browser_options = Selenium::WebDriver::Chrome::Options.new
 
   Capybara::Selenium::Driver.new app,
                                  browser: :remote,
-                                 desired_capabilities: :chrome,
                                  options: browser_options,
                                  url: url
 end
@@ -58,10 +57,10 @@ skipped_tests = %i[response_headers status_code trigger download]
 
 Capybara::SpecHelper.run_specs TestSessions::Chrome, CHROME_REMOTE_DRIVER.to_s, capybara_skip: skipped_tests do |example|
   case example.metadata[:full_description]
-  when 'Capybara::Session selenium_chrome_remote #attach_file with multipart form should not break when using HTML5 multiple file input uploading multiple files',
-       'Capybara::Session selenium_chrome_remote #attach_file with multipart form should fire change once for each set of files uploaded',
-       'Capybara::Session selenium_chrome_remote #attach_file with multipart form should fire change once when uploading multiple files from empty'
-    pending "Selenium with Remote Chrome doesn't support multiple file upload" unless selenium_gte?(3.14)
+  when /Capybara::Session selenium_chrome_remote node #shadow_root should get visible text/
+    pending "Selenium doesn't currently support getting visible text for shadow root elements"
+  when /Capybara::Session selenium_chrome_remote node #shadow_root/
+    skip 'Not supported with this chromedriver version' if chromedriver_lt?('96.0', @session)
   end
 end
 
@@ -76,20 +75,22 @@ RSpec.describe 'Capybara::Session with remote Chrome' do
   end
 
   describe 'log access' do
+    let(:logs) do
+      session.driver.browser.then do |chrome_driver|
+        chrome_driver.respond_to?(:logs) ? chrome_driver : chrome_driver.manage
+      end.logs
+    end
+
     it 'does not error when getting log types' do
       expect do
-        session.driver.browser.manage.logs.available_types
+        logs.available_types
       end.not_to raise_error
     end
 
     it 'does not error when getting logs' do
       expect do
-        session.driver.browser.manage.logs.get(:browser)
+        logs.get(:browser)
       end.not_to raise_error
     end
-  end
-
-  def chromedriver_version
-    Gem::Version.new(session.driver.browser.capabilities['chrome']['chromedriverVersion'].split[0])
   end
 end

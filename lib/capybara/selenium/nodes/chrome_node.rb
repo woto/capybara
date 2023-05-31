@@ -24,12 +24,6 @@ class Capybara::Selenium::ChromeNode < Capybara::Selenium::Node
       JS
     end
     super
-  rescue *file_errors => e
-    if e.message.match?(/File not found : .+\n.+/m)
-      raise ArgumentError, "Selenium < 3.14 with remote Chrome doesn't support multiple file upload"
-    end
-
-    raise
   end
 
   def drop(*args)
@@ -65,7 +59,7 @@ class Capybara::Selenium::ChromeNode < Capybara::Selenium::Node
     return super unless native_displayed?
 
     begin
-      bridge.send(:execute, :is_element_displayed, id: native.ref)
+      bridge.send(:execute, :is_element_displayed, id: native_id)
     rescue Selenium::WebDriver::Error::UnknownCommandError
       # If the is_element_displayed command is unknown, no point in trying again
       driver.options[:native_displayed] = false
@@ -102,12 +96,6 @@ private
     # https://bugs.chromium.org/p/chromedriver/issues/detail?id=2981
     browser_action.release.perform
     browser_action.click_and_hold(native).move_to(element.native).release.perform
-  end
-
-  def file_errors
-    @file_errors = ::Selenium::WebDriver.logger.suppress_deprecations do
-      [::Selenium::WebDriver::Error::ExpectedError]
-    end
   end
 
   def browser_version(to_float: true)

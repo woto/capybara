@@ -8,13 +8,15 @@ class TestClass
 end
 
 Capybara::SpecHelper.run_specs TestClass.new, 'DSL', capybara_skip: %i[
-  js modals screenshot frames windows send_keys server hover about_scheme psc download css driver scroll spatial html_validation shadow_dom
+  js modals screenshot frames windows send_keys server hover about_scheme psc download css driver scroll spatial html_validation shadow_dom active_element
 ] do |example|
   case example.metadata[:full_description]
   when /has_css\? should support case insensitive :class and :id options/
     pending "Nokogiri doesn't support case insensitive CSS attribute matchers"
   when /#click_button should follow permanent redirects that maintain method/
     pending "Rack < 2 doesn't support 308" if Gem.loaded_specs['rack'].version < Gem::Version.new('2.0.0')
+  when /#attach_file with multipart form should send prior hidden field if no file submitted/
+    skip 'Rack-test < 2 needs an empty file to detect multipart form' if Gem.loaded_specs['rack-test'].version < Gem::Version.new('2.0.0')
   end
 end
 
@@ -115,7 +117,7 @@ RSpec.describe Capybara::DSL do
     it 'should yield the passed block' do
       called = false
       Capybara.using_driver(:selenium) { called = true }
-      expect(called).to eq(true)
+      expect(called).to be(true)
     end
   end
 
@@ -220,7 +222,7 @@ RSpec.describe Capybara::DSL do
     it 'should yield the passed block' do
       called = false
       Capybara.using_session(:administrator) { called = true }
-      expect(called).to eq(true)
+      expect(called).to be(true)
     end
 
     it 'should be nestable' do

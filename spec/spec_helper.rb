@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'rspec/expectations'
-require 'webdrivers' if ENV['CI'] || ENV['WEBDRIVERS']
+require 'webdrivers' if ENV.fetch('WEBDRIVERS', nil)
 require 'selenium_statistics'
 if ENV['TRAVIS']
   require 'coveralls'
@@ -28,6 +28,18 @@ module Capybara
       firefox?(session) && (session.driver.browser.capabilities[:browser_version].to_f >= version)
     end
 
+    def geckodriver_version(session)
+      Gem::Version.new(session.driver.browser.capabilities['moz:geckodriverVersion'])
+    end
+
+    def geckodriver_gte?(version, session)
+      firefox?(session) && geckodriver_version(session) >= Gem::Version.new(version)
+    end
+
+    def geckodriver_lt?(version, session)
+      firefox?(session) && geckodriver_version(session) < Gem::Version.new(version)
+    end
+
     def chrome?(session)
       browser_name(session) == :chrome
     end
@@ -43,6 +55,27 @@ module Capybara
 
     def chrome_gte?(version, session)
       chrome?(session) && (chrome_version(session) >= version)
+    end
+
+    def chromedriver_version(session)
+      Gem::Version.new(session.driver.browser.capabilities['chrome']['chromedriverVersion'].split[0])
+    end
+
+    def chromedriver_gte?(version, session)
+      chrome?(session) && chromedriver_version(session) >= Gem::Version.new(version)
+    end
+
+    def chromedriver_lt?(version, session)
+      chrome?(session) && chromedriver_version(session) < Gem::Version.new(version)
+    end
+
+    def selenium?(session)
+      session.driver.is_a? Capybara::Selenium::Driver
+    end
+
+    def selenium_lt?(version, session)
+      selenium?(session) &&
+        Gem::Version.new(::Selenium::WebDriver::VERSION) < Gem::Version.new(version)
     end
 
     def edge?(session)
@@ -81,7 +114,7 @@ module Capybara
       mod = mod::Service if ::Selenium::WebDriver::Service.respond_to? :driver_path
       path = mod.driver_path
       path = path.call if path.respond_to? :call
-      $stdout.puts `#{path.gsub(' ', '\ ')} --version`
+      $stdout.puts `#{path.gsub(' ', '\ ')} --version` if path
     end
   end
 end

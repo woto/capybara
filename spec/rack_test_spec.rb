@@ -1,12 +1,6 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
-nokogumbo_required = begin
-  require 'nokogumbo'
-  true
-rescue LoadError
-  false
-end
 
 module TestSessions
   RackTest = Capybara::Session.new(:rack_test, TestApp)
@@ -28,6 +22,7 @@ skipped_tests = %i[
   spatial
   html_validation
   shadow_dom
+  active_element
 ]
 Capybara::SpecHelper.run_specs TestSessions::RackTest, 'RackTest', capybara_skip: skipped_tests do |example|
   case example.metadata[:full_description]
@@ -35,6 +30,8 @@ Capybara::SpecHelper.run_specs TestSessions::RackTest, 'RackTest', capybara_skip
     skip "Nokogiri doesn't support case insensitive CSS attribute matchers"
   when /#click_button should follow permanent redirects that maintain method/
     skip "Rack < 2 doesn't support 308" if Gem.loaded_specs['rack'].version < Gem::Version.new('2.0.0')
+  when /#attach_file with multipart form should send prior hidden field if no file submitted/
+    skip 'Rack-test < 2 needs an empty file to detect multipart form' if Gem.loaded_specs['rack-test'].version < Gem::Version.new('2.0.0')
   end
 end
 
@@ -98,6 +95,12 @@ RSpec.describe Capybara::Session do # rubocop:disable RSpec/MultipleDescribes
           session.click_button('Upload Empty')
           expect(session.html).to include('Successfully ignored empty file field.')
         end
+
+        it 'should submit multipart even if no file is submitted' do
+          session.visit('/form')
+          session.click_button('Upload Empty')
+          expect(session.html).to include('Content type was multipart/form-data;')
+        end
       end
 
       it 'should not submit an obsolete mime type' do
@@ -150,6 +153,14 @@ RSpec.describe Capybara::Session do # rubocop:disable RSpec/MultipleDescribes
         session.visit('/form')
 
         expect { session.send_keys(:tab) }.to raise_error(Capybara::NotSupportedByDriverError)
+      end
+    end
+
+    describe '#active_element' do
+      it 'raises an UnsupportedMethodError' do
+        session.visit('/form')
+
+        expect { session.active_element }.to raise_error(Capybara::NotSupportedByDriverError)
       end
     end
 
@@ -209,15 +220,21 @@ RSpec.describe Capybara::RackTest::Driver do
       driver = described_class.new(TestApp)
 
       driver.visit('/redirect')
-      expect(driver.response.header['Location']).to be_nil
+      expect(driver.response.headers['Location']).to be_nil
       expect(driver.current_url).to match %r{/landed$}
+    end
+
+    it 'should not include fragments in the referer header' do
+      driver.visit('/header_links#an-anchor')
+      driver.find_xpath('.//input').first.click
+      expect(driver.request.get_header('HTTP_REFERER')).to eq('http://www.example.com/header_links')
     end
 
     it 'is possible to not follow redirects' do
       driver = described_class.new(TestApp, follow_redirects: false)
 
       driver.visit('/redirect')
-      expect(driver.response.header['Location']).to match %r{/redirect_again$}
+      expect(driver.response.headers['Location']).to match %r{/redirect_again$}
       expect(driver.current_url).to match %r{/redirect$}
     end
   end
@@ -256,11 +273,12 @@ RSpec.describe Capybara::RackTest::Driver do
 end
 
 RSpec.describe 'Capybara::String' do
-  it 'should use gumbo' do
-    skip 'Only  valid if gumbo is included' unless nokogumbo_required
-    allow(Nokogiri).to receive(:HTML5).and_call_original
+  it 'should use HTML5 parsing' do
+    skip 'Only valid if Nokogiri >= 1.12.0 or gumbo is included' unless defined? Nokogiri::HTML5
+    Capybara.use_html5_parsing = true
+    allow(Nokogiri::HTML5).to receive(:parse).and_call_original
     Capybara.string('<div id=test_div></div>')
-    expect(Nokogiri).to have_received(:HTML5)
+    expect(Nokogiri::HTML5).to have_received(:parse)
   end
 end
 

@@ -73,9 +73,9 @@ module Capybara
     def filter_backtrace(trace)
       return 'No backtrace' unless trace
 
-      filter = %r{lib/capybara/|lib/rspec/|lib/minitest/}
+      filter = %r{lib/capybara/|lib/rspec/|lib/minitest/|delegate.rb}
       new_trace = trace.take_while { |line| line !~ filter }
-      new_trace = trace.reject { |line| line =~ filter } if new_trace.empty?
+      new_trace = trace.grep_v(filter) if new_trace.empty?
       new_trace = trace.dup if new_trace.empty?
 
       new_trace.first.split(/:in /, 2).first
@@ -85,7 +85,11 @@ module Capybara
       Kernel.warn(message, uplevel: uplevel)
     end
 
-    if defined?(Process::CLOCK_MONOTONIC)
+    if defined?(Process::CLOCK_MONOTONIC_RAW)
+      def monotonic_time; Process.clock_gettime Process::CLOCK_MONOTONIC_RAW; end
+    elsif defined?(Process::CLOCK_MONOTONIC_PRECISE)
+      def monotonic_time; Process.clock_gettime Process::CLOCK_MONOTONIC_PRECISE; end
+    elsif defined?(Process::CLOCK_MONOTONIC)
       def monotonic_time; Process.clock_gettime Process::CLOCK_MONOTONIC; end
     else
       def monotonic_time; Time.now.to_f; end

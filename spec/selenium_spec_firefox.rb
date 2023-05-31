@@ -6,8 +6,10 @@ require 'shared_selenium_session'
 require 'shared_selenium_node'
 require 'rspec/shared_spec_matchers'
 
-browser_options = ::Selenium::WebDriver::Firefox::Options.new
-browser_options.headless! if ENV['HEADLESS']
+Selenium::WebDriver.logger.ignore(:selenium_manager)
+
+browser_options = Selenium::WebDriver::Firefox::Options.new
+browser_options.add_argument '-headless' if ENV['HEADLESS']
 # browser_options.add_option("log", {"level": "trace"})
 
 browser_options.profile = Selenium::WebDriver::Firefox::Profile.new.tap do |profile|
@@ -15,6 +17,7 @@ browser_options.profile = Selenium::WebDriver::Firefox::Profile.new.tap do |prof
   profile['browser.download.folderList'] = 2
   profile['browser.helperApps.neverAsk.saveToDisk'] = 'text/csv'
   profile['browser.startup.homepage'] = 'about:blank' # workaround bug in Selenium 4 alpha4-7
+  profile['accessibility.tabfocus'] = 7 # make tab move over links too
 end
 
 Capybara.register_driver :selenium_firefox do |app|
@@ -59,18 +62,33 @@ Capybara::SpecHelper.run_specs TestSessions::SeleniumFirefox, 'selenium', capyba
   when 'Capybara::Session selenium #attach_file with multipart form should fire change once when uploading multiple files from empty'
     pending "FF < 62 doesn't support setting all files at once" if firefox_lt?(62, @session)
   when 'Capybara::Session selenium #accept_confirm should work with nested modals'
-    skip 'Broken in 63 <= FF < 69  - https://bugzilla.mozilla.org/show_bug.cgi?id=1487358' if firefox_gte?(63, @session) && firefox_lt?(69, @session)
-    skip 'Hangs in 69 <= FF < 71  - Dont know what issue for this - previous issue was closed as fixed but it is not' if firefox_gte?(69, @session) && firefox_lt?(71, @session)
-    skip 'Broken again intermittently in FF 71 - jus skip it'
+    skip 'Broken in 63 <= FF < 69 - https://bugzilla.mozilla.org/show_bug.cgi?id=1487358' if firefox_gte?(63, @session) && firefox_lt?(69, @session)
+    skip 'Hangs in 69 <= FF < 71 - Dont know what issue for this - previous issue was closed as fixed but it is not' if firefox_gte?(69, @session) && firefox_lt?(71, @session)
+    skip 'Broken again intermittently in FF 71 - jus skip it' if firefox_lt?(109, @session) # don't really know when it was fixed
   when 'Capybara::Session selenium #click_link can download a file'
     skip 'Need to figure out testing of file downloading on windows platform' if Gem.win_platform?
   when 'Capybara::Session selenium #reset_session! removes ALL cookies'
     pending "Geckodriver doesn't provide a way to remove cookies outside the current domain"
   when /drag_to.*HTML5/
-    pending "Firefox < 62 doesn't support a DataTransfer constuctor" if firefox_lt?(62.0, @session)
+    pending "Firefox < 62 doesn't support a DataTransfer constructor" if firefox_lt?(62.0, @session)
   when 'Capybara::Session selenium #accept_alert should handle the alert if the page changes',
        'Capybara::Session selenium #accept_alert with an asynchronous alert should accept the alert'
-    skip 'No clue what Firefox is doing here - works fine on MacOS locally'
+    skip 'No clue what Firefox is doing here - works fine on MacOS locally' if firefox_lt?(109, @session) # don't really know when it was fixed
+  when 'Capybara::Session selenium node #shadow_root should find elements inside the shadow dom using CSS',
+       'Capybara::Session selenium node #shadow_root should find nested shadow roots',
+       'Capybara::Session selenium node #shadow_root should click on elements',
+       'Capybara::Session selenium node #shadow_root should use convenience methods once moved to a descendant of the shadow root',
+       'Capybara::Session selenium node #shadow_root should produce error messages when failing',
+       'Capybara::Session with firefox with selenium driver #evaluate_script returns a shadow root'
+    pending "Firefox doesn't yet have full W3C shadow root support" if firefox_lt?(113, @session)
+  when 'Capybara::Session selenium #fill_in should handle carriage returns with line feeds in a textarea correctly'
+    pending 'Not sure what firefox is doing here'
+  when /Capybara::Session selenium node #shadow_root should get visible text/
+    pending "Selenium doesn't currently support getting visible text for shadow root elements"
+  when /Capybara::Session selenium node #shadow_root/
+    skip 'Not supported with this geckodriver version' if geckodriver_lt?('0.31.0', @session)
+  when /Capybara::Session selenium node #set should submit single text input forms if ended with \\n/
+    pending 'Firefox/geckodriver doesn\'t submit with values ending in \n'
   end
 end
 
@@ -102,7 +120,7 @@ RSpec.describe 'Capybara::Session with firefox' do # rubocop:disable RSpec/Multi
     end
 
     it 'should fill in a datetime input with a String' do
-      # FF doesn't currently support datetime-local so this is really just a text input
+      pending 'Need to figure out what string format this will actually accept'
       session.fill_in('form_datetime', with: datetime.iso8601)
       session.click_button('awesome')
       expect(Time.parse(extract_results(session)['datetime'])).to eq datetime

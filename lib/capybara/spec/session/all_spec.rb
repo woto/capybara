@@ -31,7 +31,7 @@ Capybara::SpecHelper.spec '#all' do
   it 'should accept an XPath instance', :exact_false do
     @session.visit('/form')
     @xpath = Capybara::Selector.new(:fillable_field, config: {}, format: :xpath).call('Name')
-    expect(@xpath).to be_a(::XPath::Union)
+    expect(@xpath).to be_a(XPath::Union)
     @result = @session.all(@xpath).map(&:value)
     expect(@result).to include('Smith', 'John', 'John Smith')
   end
@@ -132,7 +132,7 @@ Capybara::SpecHelper.spec '#all' do
       it 'should use the sessions ignore_hidden_elements', psc: true do
         Capybara.ignore_hidden_elements = true
         @session.config.ignore_hidden_elements = false
-        expect(Capybara.ignore_hidden_elements).to eq(true)
+        expect(Capybara.ignore_hidden_elements).to be(true)
         expect(@session.all(:css, 'a.simple').size).to eq(2)
         @session.config.ignore_hidden_elements = true
         expect(@session.all(:css, 'a.simple').size).to eq(1)
@@ -208,12 +208,10 @@ Capybara::SpecHelper.spec '#all' do
         expect { @session.all(:css, 'h1, p', between: 5..) }.to raise_error(Capybara::ExpectationNotMet)
       end
 
-      eval <<~TEST, binding, __FILE__, __LINE__ + 1 if RUBY_VERSION.to_f > 2.6
-        it'treats a beginless range as maximum' do
-          expect { @session.all(:css, 'h1, p', between: ..7) }.not_to raise_error
-          expect { @session.all(:css, 'h1, p', between: ..3) }.to raise_error(Capybara::ExpectationNotMet)
-        end
-      TEST
+      it 'treats a beginless range as maximum' do
+        expect { @session.all(:css, 'h1, p', between: ..7) }.not_to raise_error
+        expect { @session.all(:css, 'h1, p', between: ..3) }.to raise_error(Capybara::ExpectationNotMet)
+      end
     end
 
     context 'with multiple count filters' do

@@ -47,20 +47,20 @@ YARD::Rake::YardocTask.new do |t|
 end
 
 Cucumber::Rake::Task.new(:cucumber) do |task|
-  task.cucumber_opts = ['--format=progress', 'features']
+  task.cucumber_opts = ['--format=progress', '--publish-quiet', 'features']
 end
 
 desc 'Task for running CI'
 task :travis do
-  if ENV['CAPYBARA_REMOTE'] && ENV['CAPYBARA_FF']
+  if ENV.fetch('CAPYBARA_REMOTE', nil) && ENV.fetch('CAPYBARA_FF', nil)
     Rake::Task[:spec_firefox_remote].invoke
-  elsif ENV['CAPYBARA_FF']
+  elsif ENV.fetch('CAPYBARA_FF', nil)
     Rake::Task[:spec_firefox].invoke
-  elsif ENV['CAPYBARA_IE']
+  elsif ENV.fetch('CAPYBARA_IE', nil)
     Rake::Task[:spec_ie].invoke
-  elsif ENV['CAPYBARA_EDGE']
+  elsif ENV.fetch('CAPYBARA_EDGE', nil)
     Rake::Task[:spec_edge].invoke
-  elsif ENV['CAPYBARA_REMOTE']
+  elsif ENV.fetch('CAPYBARA_REMOTE', nil)
     Rake::Task[:spec_chrome_remote].invoke
   else
     Rake::Task[:spec_chrome].invoke
@@ -72,7 +72,7 @@ desc 'Build updated JS replacements for Selenium atoms'
 task :build_js do
   require 'uglifier'
   Dir.glob('./lib/capybara/selenium/atoms/src/*.js').each do |fn|
-    js = ::Uglifier.compile(
+    js = Uglifier.compile(
       File.read(fn),
       compress: {
         negate_iife: false, # Negate immediately invoked function expressions to avoid extra parens

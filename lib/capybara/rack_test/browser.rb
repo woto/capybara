@@ -20,6 +20,8 @@ class Capybara::RackTest::Browser
   end
 
   def visit(path, **attributes)
+    @new_visit_request = true
+    reset_cache!
     reset_host!
     process_and_follow_redirects(:get, path, attributes)
   end
@@ -29,23 +31,28 @@ class Capybara::RackTest::Browser
     request(last_request.fullpath, last_request.env)
   end
 
-  def submit(method, path, attributes)
+  def submit(method, path, attributes, content_type: nil)
     path = request_path if path.nil? || path.empty?
     uri = build_uri(path)
     uri.query = '' if method.to_s.casecmp('get').zero?
-    process_and_follow_redirects(method, uri.to_s, attributes, 'HTTP_REFERER' => current_url)
+    process_and_follow_redirects(
+      method,
+      uri.to_s,
+      attributes,
+      'HTTP_REFERER' => referer_url,
+      'CONTENT_TYPE' => content_type
+    )
   end
 
   def follow(method, path, **attributes)
     return if fragment_or_script?(path)
 
-    process_and_follow_redirects(method, path, attributes, 'HTTP_REFERER' => current_url)
+    process_and_follow_redirects(method, path, attributes, 'HTTP_REFERER' => referer_url)
   end
 
   def process_and_follow_redirects(method, path, attributes = {}, env = {})
     @current_fragment = build_uri(path).fragment
     process(method, path, attributes, env)
-
     return unless driver.follow_redirects?
 
     driver.redirect_limit.times do
@@ -69,18 +76,23 @@ class Capybara::RackTest::Browser
     @current_scheme, @current_host, @current_port = new_uri.select(:scheme, :host, :port)
     @current_fragment = new_uri.fragment || @current_fragment
     reset_cache!
+    @new_visit_request = false
     send(method, new_uri.to_s, attributes, env.merge(options[:headers] || {}))
   end
 
   def build_uri(path)
-    URI.parse(path).tap do |uri|
-      uri.path = request_path if path.empty? || path.start_with?('?')
-      uri.path = '/' if uri.path.empty?
-      uri.path = request_path.sub(%r{/[^/]*$}, '/') + uri.path unless uri.path.start_with?('/')
+    uri = URI.parse(path)
+    base_uri = base_relative_uri_for(uri)
 
+    uri.path = base_uri.path + uri.path unless uri.absolute? || uri.path.start_with?('/')
+
+    if base_uri.absolute?
+      base_uri.merge(uri)
+    else
       uri.scheme ||= @current_scheme
       uri.host ||= @current_host
       uri.port ||= @current_port unless uri.default_port == @current_port
+      uri
     end
   end
 
@@ -123,7 +135,38 @@ class Capybara::RackTest::Browser
     dom.title
   end
 
+  def last_request
+    raise Rack::Test::Error if @new_visit_request
+
+    super
+  end
+
+  def last_response
+    raise Rack::Test::Error if @new_visit_request
+
+    super
+  end
+
 protected
+
+  def base_href
+    find(:css, 'head > base').first&.[](:href).to_s
+  end
+
+  def base_relative_uri_for(uri)
+    base_uri = URI.parse(base_href)
+    current_uri = URI.parse(safe_last_request&.url.to_s).tap do |c|
+      c.path.sub!(%r{/[^/]*$}, '/') unless uri.path.empty?
+      c.path = '/' if c.path.empty?
+    end
+
+    if [current_uri, base_uri].any?(&:absolute?)
+      current_uri.merge(base_uri)
+    else
+      base_uri.path = current_uri.path if base_uri.path.empty?
+      base_uri
+    end
+  end
 
   def build_rack_mock_session
     reset_host! unless current_host
@@ -136,9 +179,21 @@ protected
     '/'
   end
 
+  def safe_last_request
+    last_request
+  rescue Rack::Test::Error
+    nil
+  end
+
 private
 
   def fragment_or_script?(path)
     path.gsub(/^#{Regexp.escape(request_path)}/, '').start_with?('#') || path.downcase.start_with?('javascript:')
+  end
+
+  def referer_url
+    build_uri(last_request.url).to_s
+  rescue Rack::Test::Error
+    ''
   end
 end

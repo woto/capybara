@@ -110,6 +110,18 @@ Capybara::SpecHelper.spec '#has_field' do
     end
   end
 
+  context 'with focused:', requires: [:active_element] do
+    it 'should be true if a field has focus' do
+      2.times { @session.send_keys(:tab) }
+
+      expect(@session).to have_field('An Input', focused: true)
+    end
+
+    it 'should be false if a field does not have focus' do
+      expect(@session).to have_field('An Input', focused: false)
+    end
+  end
+
   context 'with valid', requires: [:js] do
     it 'should be true if field is valid' do
       @session.fill_in 'required', with: 'something'
@@ -182,6 +194,18 @@ Capybara::SpecHelper.spec '#has_no_field' do
       expect(@session).to have_no_field('Description', type: '')
       expect(@session).to have_no_field('Description', type: 'email')
       expect(@session).to have_no_field('Languages', type: 'textarea')
+    end
+  end
+
+  context 'with focused:', requires: [:active_element] do
+    it 'should be true if a field does not have focus when focused: true' do
+      expect(@session).to have_no_field('An Input', focused: true)
+    end
+
+    it 'should be false if a field has focus when focused: true' do
+      2.times { @session.send_keys(:tab) }
+
+      expect(@session).not_to have_no_field('An Input', focused: true)
     end
   end
 end
@@ -359,7 +383,7 @@ Capybara::SpecHelper.spec '#has_no_unchecked_field?' do
   end
 
   it 'should support locator-less usage' do
-    expect(@session.has_no_unchecked_field?(disabled: false, id: 'form_disabled_unchecked_checkbox')).to eq true
+    expect(@session.has_no_unchecked_field?(disabled: false, id: 'form_disabled_unchecked_checkbox')).to be true
     expect(@session).to have_no_unchecked_field(disabled: false, id: 'form_disabled_unchecked_checkbox')
   end
 end

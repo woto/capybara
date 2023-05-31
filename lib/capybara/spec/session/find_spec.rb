@@ -236,7 +236,7 @@ Capybara::SpecHelper.spec '#find' do
   it 'should accept an XPath instance' do
     @session.visit('/form')
     @xpath = Capybara::Selector.new(:fillable_field, config: {}, format: :xpath).call('First Name')
-    expect(@xpath).to be_a(::XPath::Union)
+    expect(@xpath).to be_a(XPath::Union)
     expect(@session.find(@xpath).value).to eq('John')
   end
 
@@ -527,5 +527,11 @@ Capybara::SpecHelper.spec '#find' do
       Capybara.test_id = 'data-test-id'
       expect(@session.find(:link, 'test-foo')[:id]).to eq 'foo'
     end
+  end
+
+  it 'should warn if passed count options' do
+    allow(Capybara::Helpers).to receive(:warn)
+    @session.find('//h1', count: 44)
+    expect(Capybara::Helpers).to have_received(:warn).with(/'find' does not support count options/)
   end
 end

@@ -127,11 +127,7 @@ Capybara::SpecHelper.spec '#has_text?' do
         def to_hash; { value: 'Other hash' } end
       end.new
       @session.visit('/with_html')
-      if RUBY_VERSION >= '2.7'
-        expect(@session).to have_text(:visible, with_to_hash, **{})
-      else
-        expect(@session).to have_text(:visible, with_to_hash, {})
-      end
+      expect(@session).to have_text(:visible, with_to_hash, **{})
     end
   end
 
@@ -157,16 +153,12 @@ Capybara::SpecHelper.spec '#has_text?' do
     expect(@session).to have_text(42)
   end
 
-  it 'should be true when passed nil' do
+  it 'should be true when passed nil, and warn about it' do
     # nil is converted to '' when to_s is invoked
     @session.visit('/with_html')
-    expect(@session).to have_text(nil)
-  end
-
-  it 'should warn when passed nil' do
-    @session.visit('/with_html')
-    expect_any_instance_of(Kernel).to receive(:warn).with(/Checking for expected text of nil is confusing/) # rubocop:disable RSpec/AnyInstance
-    expect(@session).to have_text(nil)
+    expect do
+      expect(@session).to have_text(nil)
+    end.to output(/Checking for expected text of nil is confusing/).to_stderr
   end
 
   it 'should wait for text to appear', requires: [:js] do
@@ -356,7 +348,7 @@ Capybara::SpecHelper.spec '#has_no_text?' do
     expect(@session).to have_no_text(/xxxxyzzz/)
   end
 
-  it 'should be false if the text in the page  matches given regexp' do
+  it 'should be false if the text in the page matches given regexp' do
     @session.visit('/with_html')
     expect(@session).not_to have_no_text(/Lorem/)
   end

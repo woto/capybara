@@ -115,7 +115,7 @@ module Capybara
       #
       # @return [Capybara::Node::Element]  The element
       def set(value, **options)
-        if ENV['CAPYBARA_THOROUGH'] && readonly?
+        if ENV.fetch('CAPYBARA_THOROUGH', nil) && readonly?
           raise Capybara::ReadOnlyElementError, "Attempt to set readonly element with value: #{value}"
         end
 
@@ -474,6 +474,17 @@ module Capybara
 
       ##
       #
+      # Return the shadow_root for the current element
+      #
+      # @return [Capybara::Node::Element]  The shadow root
+
+      def shadow_root
+        root = synchronize { base.shadow_root }
+        root && Capybara::Node::Element.new(session, root, nil, nil)
+      end
+
+      ##
+      #
       # Execute the given JS in the context of the element not returning a result. This is useful for scripts that return
       # complex objects, such as jQuery statements. {#execute_script} should be used over
       # {#evaluate_script} whenever a result is not expected or needed. `this` in the script will refer to the element this is called on.
@@ -550,7 +561,7 @@ module Capybara
         return self unless @allow_reload
 
         begin
-          reloaded = @query.resolve_for(query_scope.reload)[@query_idx.to_i]
+          reloaded = @query.resolve_for(query_scope ? query_scope.reload : session)[@query_idx.to_i]
           @base = reloaded.base if reloaded
         rescue StandardError => e
           raise e unless catch_error?(e)
